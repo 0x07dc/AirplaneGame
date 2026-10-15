@@ -29,6 +29,20 @@ const Window = struct {
     configured: bool = false,
     should_close: bool = false,
     resized: bool = false,
+    seat: ?*c.struct_wl_seat = null,
+    keyboard: ?*c.struct_wl_keyboard = null,
+    /// Physical key state indexed by evdev keycode (layout independent).
+    keys: [256]bool = [_]bool{false} ** 256,
+
+    const seat_listener: c.struct_wl_seat_listener = .{ .capabilities = onSeatCaps, .name = onSeatName };
+    const kb_listener: c.struct_wl_keyboard_listener = .{
+        .keymap = onKbKeymap,
+        .enter = onKbEnter,
+        .leave = onKbLeave,
+        .key = onKbKey,
+        .modifiers = onKbMods,
+        .repeat_info = onKbRepeat,
+    };
 
     const registry_listener: c.struct_wl_registry_listener = .{
         .global = onGlobal,
@@ -87,7 +101,41 @@ const Window = struct {
             self.compositor = @ptrCast(c.wl_registry_bind(reg, name, &c.wl_compositor_interface, @min(version, 4)));
         } else if (std.mem.eql(u8, i, "xdg_wm_base")) {
             self.wm_base = @ptrCast(c.wl_registry_bind(reg, name, &c.xdg_wm_base_interface, 1));
+        } else if (std.mem.eql(u8, i, "wl_seat") and self.seat == null) {
+            const seat: *c.struct_wl_seat = @ptrCast(c.wl_registry_bind(reg, name, &c.wl_seat_interface, @min(version, 5)));
+            self.seat = seat;
+            _ = c.wl_seat_add_listener(seat, &seat_listener, self);
         }
+    }
+    fn onSeatCaps(data: ?*anyopaque, seat: ?*c.struct_wl_seat, caps: u32) callconv(.c) void {
+        const self: *Window = @ptrCast(@alignCast(data));
+        const has_kb = (caps & c.WL_SEAT_CAPABILITY_KEYBOARD) != 0;
+        if (has_kb and self.keyboard == null) {
+            self.keyboard = c.wl_seat_get_keyboard(seat);
+            _ = c.wl_keyboard_add_listener(self.keyboard, &kb_listener, self);
+        } else if (!has_kb and self.keyboard != null) {
+            c.wl_keyboard_release(self.keyboard);
+            self.keyboard = null;
+        }
+    }
+    fn onSeatName(_: ?*anyopaque, _: ?*c.struct_wl_seat, _: [*c]const u8) callconv(.c) void {}
+    fn onKbKeymap(_: ?*anyopaque, _: ?*c.struct_wl_keyboard, _: u32, fd: i32, _: u32) callconv(.c) void {
+        _ = c.close(fd); // we use raw evdev scancodes, no xkb keymap needed
+    }
+    fn onKbEnter(_: ?*anyopaque, _: ?*c.struct_wl_keyboard, _: u32, _: ?*c.struct_wl_surface_2, _: [*c]c.struct_wl_array) callconv(.c) void {}
+    fn onKbLeave(data: ?*anyopaque, _: ?*c.struct_wl_keyboard, _: u32, _: ?*c.struct_wl_surface_2) callconv(.c) void {
+        const self: *Window = @ptrCast(@alignCast(data));
+        self.keys = [_]bool{false} ** 256; // avoid stuck keys on focus loss
+    }
+    fn onKbKey(data: ?*anyopaque, _: ?*c.struct_wl_keyboard, _: u32, _: u32, key: u32, state: u32) callconv(.c) void {
+        const self: *Window = @ptrCast(@alignCast(data));
+        if (key < self.keys.len) self.keys[key] = state == c.WL_KEYBOARD_KEY_STATE_PRESSED;
+    }
+    fn onKbMods(_: ?*anyopaque, _: ?*c.struct_wl_keyboard, _: u32, _: u32, _: u32, _: u32, _: u32) callconv(.c) void {}
+    fn onKbRepeat(_: ?*anyopaque, _: ?*c.struct_wl_keyboard, _: i32, _: i32) callconv(.c) void {}
+
+    fn down(self: *const Window, key: Key) bool {
+        return self.keys[@intFromEnum(key)];
     }
     fn onGlobalRemove(_: ?*anyopaque, _: ?*c.struct_wl_registry, _: u32) callconv(.c) void {}
     fn onPing(_: ?*anyopaque, wm: ?*c.struct_xdg_wm_base, serial: u32) callconv(.c) void {
@@ -113,6 +161,65 @@ const Window = struct {
     fn onConfigureBounds(_: ?*anyopaque, _: ?*c.struct_xdg_toplevel, _: i32, _: i32) callconv(.c) void {}
     fn onWmCapabilities(_: ?*anyopaque, _: ?*c.struct_xdg_toplevel, _: [*c]c.struct_wl_array) callconv(.c) void {}
 };
+
+/// Linux evdev keycodes (linux/input-event-codes.h).
+const Key = enum(u8) {
+    esc = 1,
+    q = 16,
+    w = 17,
+    e = 18,
+    a = 30,
+    s = 31,
+    d = 32,
+    shift = 42,
+    space = 57,
+    up = 103,
+    left = 105,
+    right = 106,
+    down = 108,
+};
+
+/// Push constants shared with tri.vert.
+const Push = extern struct {
+    offset: [2]f32,
+    angle: f32,
+    aspect: f32,
+};
+
+/// Fixed-step simulation state (prototype; becomes the flight model).
+const Sim = struct {
+    pos: [2]f32 = .{ 0, 0 },
+    vel: [2]f32 = .{ 0, 0 },
+    angle: f32 = 0,
+    ang_vel: f32 = 0,
+
+    const dt: f32 = 1.0 / 120.0;
+
+    fn step(self: *Sim, win: *const Window) void {
+        const ax: f32 = axis(win.down(.d), win.down(.a));
+        const ay: f32 = axis(win.down(.s), win.down(.w)); // screen y is down
+        const spin: f32 = axis(win.down(.e), win.down(.q));
+        const boost: f32 = if (win.down(.shift)) 2.5 else 1.0;
+        // Direct-control with critically-damped-ish smoothing: snappy but not jittery.
+        const k = 1.0 - @exp(-dt / 0.06);
+        self.vel[0] += (ax * 1.5 * boost - self.vel[0]) * k;
+        self.vel[1] += (ay * 1.5 * boost - self.vel[1]) * k;
+        self.ang_vel += (spin * 6.0 - self.ang_vel) * k;
+        self.pos[0] = std.math.clamp(self.pos[0] + self.vel[0] * dt, -2, 2);
+        self.pos[1] = std.math.clamp(self.pos[1] + self.vel[1] * dt, -1, 1);
+        self.angle += self.ang_vel * dt;
+    }
+
+    fn axis(pos: bool, neg: bool) f32 {
+        return (if (pos) @as(f32, 1) else 0) - (if (neg) @as(f32, 1) else 0);
+    }
+};
+
+fn nowSeconds() f64 {
+    var ts: c.struct_timespec = undefined;
+    _ = c.clock_gettime(c.CLOCK_MONOTONIC, &ts);
+    return @as(f64, @floatFromInt(ts.tv_sec)) + @as(f64, @floatFromInt(ts.tv_nsec)) * 1e-9;
+}
 
 // ───────────────────────── Vulkan ─────────────────────────
 
@@ -273,7 +380,12 @@ const Renderer = struct {
         const fs = try self.shaderModule(&frag_spv);
         defer c.vkDestroyShaderModule(self.device, fs, null);
 
-        const plci = c.VkPipelineLayoutCreateInfo{ .sType = c.VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
+        const pcr = c.VkPushConstantRange{ .stageFlags = c.VK_SHADER_STAGE_VERTEX_BIT, .offset = 0, .size = @sizeOf(Push) };
+        const plci = c.VkPipelineLayoutCreateInfo{
+            .sType = c.VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+            .pushConstantRangeCount = 1,
+            .pPushConstantRanges = &pcr,
+        };
         try vk(c.vkCreatePipelineLayout(self.device, &plci, null, &self.layout));
 
         const stages = [_]c.VkPipelineShaderStageCreateInfo{
@@ -432,7 +544,7 @@ const Renderer = struct {
     }
 
     /// Returns false if the swapchain must be recreated.
-    fn drawFrame(self: *Renderer, time: f32) !bool {
+    fn drawFrame(self: *Renderer, time: f32, sim: *const Sim) !bool {
         try vk(c.vkWaitForFences(self.device, 1, &self.fence, c.VK_TRUE, std.math.maxInt(u64)));
         var idx: u32 = 0;
         const acq = c.vkAcquireNextImageKHR(self.device, self.swapchain, std.math.maxInt(u64), self.acquire_sem, null, &idx);
@@ -473,6 +585,12 @@ const Renderer = struct {
         const scissor = c.VkRect2D{ .offset = .{ .x = 0, .y = 0 }, .extent = self.extent };
         c.vkCmdSetViewport(self.cmd, 0, 1, &viewport);
         c.vkCmdSetScissor(self.cmd, 0, 1, &scissor);
+        const push = Push{
+            .offset = sim.pos,
+            .angle = sim.angle,
+            .aspect = @as(f32, @floatFromInt(self.extent.width)) / @as(f32, @floatFromInt(self.extent.height)),
+        };
+        c.vkCmdPushConstants(self.cmd, self.layout, c.VK_SHADER_STAGE_VERTEX_BIT, 0, @sizeOf(Push), &push);
         c.vkCmdDraw(self.cmd, 3, 1, 0, 0);
         c.vkCmdEndRendering(self.cmd);
 
@@ -534,15 +652,24 @@ pub fn main() !void {
     else
         0;
 
+    var sim = Sim{};
     var frame: u64 = 0;
-    while (!win.should_close) {
+    var last = nowSeconds();
+    var acc: f64 = 0;
+    while (!win.should_close and !win.down(.esc)) {
         win.pump();
         if (win.resized) {
             win.resized = false;
             try r.recreate(win.width, win.height);
         }
-        const t: f32 = @as(f32, @floatFromInt(frame)) / 60.0;
-        if (!try r.drawFrame(t)) try r.recreate(win.width, win.height);
+        // Fixed-step simulation, decoupled from render rate.
+        const now = nowSeconds();
+        acc = @min(acc + (now - last), 0.25);
+        last = now;
+        while (acc >= Sim.dt) : (acc -= Sim.dt) sim.step(&win);
+
+        const t: f32 = @floatCast(now);
+        if (!try r.drawFrame(t, &sim)) try r.recreate(win.width, win.height);
         frame += 1;
         if (max_frames != 0 and frame >= max_frames) break;
     }
