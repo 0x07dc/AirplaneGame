@@ -26,7 +26,7 @@ pub fn build(b: *std.Build) void {
     mod.linkSystemLibrary("vulkan", .{});
 
     // ---- Shaders: GLSL -> SPIR-V via glslc ----
-    const shaders = [_][]const u8{ "tri.vert", "tri.frag" };
+    const shaders = [_][]const u8{ "mesh.vert", "mesh.frag" };
     inline for (shaders) |name| {
         const cmd = b.addSystemCommand(&.{ "glslc", "--target-env=vulkan1.3", "-O" });
         cmd.addFileArg(b.path("shaders/" ++ name));
