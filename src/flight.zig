@@ -438,7 +438,7 @@ pub const Plane = struct {
         }
     }
 
-    /// Triggered by pressing 'R': immediately places the aircraft onto the nearest friendly aircraft carrier deck,
+    /// Triggered by pressing 'Y': immediately places the aircraft onto the nearest friendly aircraft carrier deck,
     /// resting stationary on the craft for exactly 15 seconds of emergency recovery and full hull recharge,
     /// followed by an automated catapult launch.
     pub fn emergencyRecoverCarrier(self: *Plane, carriers: []const planet.AircraftCarrier) void {
@@ -1566,7 +1566,7 @@ test "Plane.emergencyRecoverCarrier: places on craft for 15s healing, recharges 
     plane.speed = 800.0;
     plane.health = 5.0;
 
-    // Press 'R' -> emergencyRecoverCarrier
+    // Press 'Y' -> emergencyRecoverCarrier
     plane.emergencyRecoverCarrier(&carriers);
 
     // Must be placed directly on the carrier deck in healing mode

@@ -685,7 +685,7 @@ fn printHelp() void {
         \\  Simulated Lag Preset:    L  (Cycles LAN -> 35ms -> 85ms -> 175ms -> 320ms)
         \\  Carrier Deck Landing:    Stern Glide Slope < 70 m/s to arrest and reup health
         \\  Carrier Autopilot:       PRESS H or ` (Backtick) to toggle auto recovery & 5s recharge
-        \\  Emergency Recovery:      PRESS R (Places plane on carrier craft for 15s to recover from glitches)
+        \\  Emergency Recovery:      PRESS Y (Places plane on carrier craft for 15s to recover from glitches)
         \\
     ;
     std.debug.print("{s}", .{help_text});
@@ -1866,7 +1866,7 @@ pub fn main(init: std.process.Init.Minimal) !void {
         "COCKPIT ZOOM      : Z (DECLUTTERS HUD WHILE ZOOMED)",
         "TRANSMISSION GEAR : 1 TO 9 (SPEEDS 20..3800 M/S), 0 (REVERSE)",
         "CARRIER RECOVERY  : PRESS H  OR  ` (TOGGLE AUTOPILOT RECOVERY)",
-        "EMERGENCY RESPAWN : PRESS R (15S COOLDOWN // GLITCH ESCAPE)",
+        "EMERGENCY RECOVERY : PRESS Y (15S CARRIER CRAFT DOCK // GLITCH ESCAPE)",
     };
     var mesh_guide_rows: [11]*const gfx.Mesh = undefined;
     for (guide_entries, 0..) |entry_txt, gi| {
@@ -2891,8 +2891,8 @@ pub fn main(init: std.process.Init.Minimal) !void {
                 plane.respawnNearestCarrier(world_objects.carriers[0..world_objects.carrier_count]);
                 screen_state = .in_game;
             }
-            if (win.respawn_pressed) {
-                win.respawn_pressed = false;
+            if (win.r_pressed) {
+                win.r_pressed = false;
                 net_mgr.refreshServerList(now);
             }
             if (win.esc_pressed) { win.esc_pressed = false; screen_state = .main_menu; }
@@ -2998,8 +2998,8 @@ pub fn main(init: std.process.Init.Minimal) !void {
                 win.m_pressed = false;
                 select_action = 1;
             }
-            if (win.respawn_pressed) {
-                win.respawn_pressed = false;
+            if (win.r_pressed) {
+                win.r_pressed = false;
                 select_action = 2;
             }
             if (win.bomb_pressed) {
@@ -3167,10 +3167,11 @@ pub fn main(init: std.process.Init.Minimal) !void {
             }
         }
 
-        // Press 'R' for emergency recovery at nearest friendly Aircraft Carrier:
+        // Press 'Y' for emergency recovery at nearest friendly Aircraft Carrier:
         // Places plane on the carrier craft for 15 seconds with live countdown timer!
-        if (screen_state == .in_game and win.respawn_pressed) {
+        if (screen_state == .in_game and (win.respawn_pressed or win.y_pressed)) {
             win.respawn_pressed = false;
+            win.y_pressed = false;
             if (respawn_cooldown <= 0.0) {
                 plane.emergencyRecoverCarrier(world_objects.carriers[0..world_objects.carrier_count]);
                 respawn_cooldown = 15.0;
@@ -3532,7 +3533,7 @@ pub fn main(init: std.process.Init.Minimal) !void {
         if (!was_dead and plane.is_dead) {
             battle.spawnExplosion(plane.pos, plane.team);
             battle.red_score += 1;
-            log.info("PILOT DOWN! Craft destroyed. Auto-respawning in 2.5s (or press 'R' to respawn immediately)...", .{});
+            log.info("PILOT DOWN! Craft destroyed. Auto-respawning in 2.5s (or press 'Y' to respawn immediately)...", .{});
         }
         // If player just respawned from death timer
         if (was_dead and !plane.is_dead) {

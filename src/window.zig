@@ -29,6 +29,8 @@ pub const Window = struct {
     mouse_right_clicked: bool = false,
     grave_pressed: bool = false,
     respawn_pressed: bool = false,
+    r_pressed: bool = false,
+    y_pressed: bool = false,
     target_pressed: bool = false,
     tab_pressed: bool = false,
     enter_pressed: bool = false,
@@ -234,6 +236,9 @@ pub const Window = struct {
             if (key == @intFromEnum(Key.grave)) {
                 self.grave_pressed = true;
             } else if (key == @intFromEnum(Key.r)) {
+                self.r_pressed = true;
+            } else if (key == @intFromEnum(Key.y)) {
+                self.y_pressed = true;
                 self.respawn_pressed = true;
             } else if (key == @intFromEnum(Key.t)) {
                 self.target_pressed = true;
@@ -348,6 +353,7 @@ pub const Key = enum(u8) {
     e = 18,
     r = 19,
     t = 20,
+    y = 21,
     p = 25,
     lbracket = 26,
     rbracket = 27,
