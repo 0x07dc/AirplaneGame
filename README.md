@@ -250,7 +250,7 @@ Every combat sortie is standardized around three balanced theater sizes:
 | **Reverse Gear** | `0` | — | Ground carrier deck taxiing and emergency stopping |
 | **Target Lock Cycle** | `T` / `TAB` | — | Cycles combat radar lock across airborne hostiles |
 | **Carrier Autopilot** | **``` ` ```** (Backtick) | `H` | Toggles automated carrier landing, 5s repair & takeoff |
-| **Emergency Respawn** | **`R`** | — | Deploys at nearest carrier with 15s cooldown for glitch escape |
+| **Emergency Recovery** | **`R`** | — | Places plane on carrier craft for 15s to recover from glitches |
 | **Cycle Network Lag** | **`L`** | — | Cycles simulated latency (0ms, 35ms, 85ms, 175ms, 320ms) |
 | **Tactical Pause Menu** | **`ESC`** / `P` | — | Freezes flight in place; inspect airframe or access menus |
 
@@ -286,9 +286,9 @@ Patrolling supercarriers act as mobile forward operating bases:
    - Hull integrity is restored to **100% HP** with visual nanite repair particles.
    - Vulcan cannon ammo, homing missiles, and bombs are reloaded to full capacity.
 4. **Catapult Launch**: Engage **`LEFT SHIFT`** (Afterburner Boost) to launch off the carrier bow.
-5. **Emergency Respawn (Key: `R` // 15-Second Cooldown)**:
-   - If caught in a glitch, stuck in terrain, or trapped in an anomaly, press **`R`** to immediately execute an Emergency Respawn onto the nearest friendly aircraft carrier flight deck with full health and restored manual flight control.
-   - Emergency respawns have a **15-second cooldown timer** to prevent tactical combat exploitation while ensuring you never get stuck.
+5. **Emergency Carrier Recovery (Key: `R` // 15-Second Cooldown)**:
+   - If caught in a glitch, stuck in terrain, or trapped in an anomaly, press **`R`** to immediately place your aircraft onto the flight deck of the nearest friendly carrier craft for 15 seconds of emergency recovery and full hull recharge, followed by an automated catapult launch.
+   - A live tactical countdown banner displays **`EMERGENCY RECOVERY: XX S`** on your HUD while docked on the craft, with a 15-second cooldown timer between uses.
 
 ---
 

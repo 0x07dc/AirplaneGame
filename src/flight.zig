@@ -152,6 +152,8 @@ pub const Plane = struct {
     carrier_mode: CarrierMode = .free_flight,
     target_carrier: usize = 0,
     carrier_timer: f32 = 0,
+    carrier_heal_duration: f32 = 5.0,
+    is_emergency_recovery: bool = false,
     deck_progress: f32 = 0,
     respawns: u32 = 0,
     flight_time: f32 = 0.0,
@@ -436,6 +438,51 @@ pub const Plane = struct {
         }
     }
 
+    /// Triggered by pressing 'R': immediately places the aircraft onto the nearest friendly aircraft carrier deck,
+    /// resting stationary on the craft for exactly 15 seconds of emergency recovery and full hull recharge,
+    /// followed by an automated catapult launch.
+    pub fn emergencyRecoverCarrier(self: *Plane, carriers: []const planet.AircraftCarrier) void {
+        var best_idx: usize = 0;
+        var best_dist: f32 = std.math.inf(f32);
+        for (carriers, 0..) |car, i| {
+            if (car.team != self.team) continue;
+            const d = car.pos.sub(self.pos).len();
+            if (d < best_dist) {
+                best_dist = d;
+                best_idx = i;
+            }
+        }
+        if (best_idx < carriers.len) {
+            const car = carriers[best_idx];
+            const deck_height: f32 = 21.2;
+            const mid_deck = car.pos.add(car.dir.scale(deck_height)).add(car.fwd.scale(15.0));
+            self.pos = mid_deck;
+            self.prev_pos = mid_deck;
+            self.rot = car.rot;
+            self.prev_rot = car.rot;
+            self.dir = car.fwd;
+            self.speed = 0.0;
+            self.is_dead = false;
+            self.death_timer = 0.0;
+            self.target_carrier = best_idx;
+            self.carrier_mode = .healing;
+            self.carrier_timer = 0.0;
+            self.carrier_heal_duration = 15.0;
+            self.is_emergency_recovery = true;
+            self.rates = Vec3.zero;
+            self.locked_target = null;
+            self.target_passed = false;
+            self.firing_solution = false;
+            self.bfm_phase = .scan;
+            self.health = 10.0;
+        } else {
+            self.respawn();
+            self.health = 100.0;
+            self.is_dead = false;
+            self.death_timer = 0.0;
+        }
+    }
+
     pub fn respawn(self: *Plane) void {
         self.spawnAt(Vec3.init(0, 1, 0), Vec3.forward);
     }
@@ -619,24 +666,27 @@ pub const Plane = struct {
                 if (t >= 1.0) {
                     self.carrier_mode = .healing;
                     self.carrier_timer = 0;
+                    self.carrier_heal_duration = 5.0;
+                    self.is_emergency_recovery = false;
                     self.speed = 0;
                     self.rot = car.rot;
                 }
             },
             .healing => {
-                // Parked on the flight deck: spend exactly 5.0 seconds recharging health to 100%
+                // Parked on the flight deck: spend `carrier_heal_duration` (5.0s normal, 15.0s emergency recovery) recharging health to 100%
                 self.carrier_timer += dt;
                 self.pos = mid_deck;
                 self.rot = car.rot;
                 self.dir = car.fwd;
                 self.speed = 0;
                 self.alt_agl = deck_height;
-                const heal_duration: f32 = 5.0;
+                const heal_duration = self.carrier_heal_duration;
                 self.health = @min(self.max_health, self.health + (self.max_health / heal_duration) * dt);
                 if (self.carrier_timer >= heal_duration) {
                     self.health = self.max_health;
                     self.carrier_mode = .takeoff_roll;
                     self.carrier_timer = 0;
+                    self.is_emergency_recovery = false;
                 }
             },
             .takeoff_roll => {
@@ -1492,4 +1542,65 @@ test "carrier auto-pilot recovery sequence: approach, 5-second recharge, and cat
     try std.testing.expectEqual(@as(?usize, null), disengaged);
     try std.testing.expectEqual(CarrierMode.free_flight, plane.carrier_mode);
 }
+
+test "Plane.emergencyRecoverCarrier: places on craft for 15s healing, recharges to 100%, and launches" {
+    var plane = Plane{};
+    const up = Vec3.init(0, 1, 0);
+    const fwd = Vec3.init(0, 0, 1);
+    const right = Vec3.init(1, 0, 0);
+    const r = planet.surfaceRadius(up);
+    const car_pos = up.scale(r);
+    const carriers = [_]planet.AircraftCarrier{.{
+        .pos = car_pos,
+        .dir = up,
+        .fwd = fwd,
+        .right = right,
+        .rot = planet.fromBasis(right, up, fwd.scale(-1.0)),
+        .team = .friendly,
+        .color = Vec3.init(0.2, 0.5, 1.0),
+    }};
+
+    // Plane in mid-air far away, glitching or dying
+    plane.spawnAt(up, fwd);
+    plane.pos = car_pos.add(Vec3.init(1000, 500, 1000));
+    plane.speed = 800.0;
+    plane.health = 5.0;
+
+    // Press 'R' -> emergencyRecoverCarrier
+    plane.emergencyRecoverCarrier(&carriers);
+
+    // Must be placed directly on the carrier deck in healing mode
+    try std.testing.expectEqual(CarrierMode.healing, plane.carrier_mode);
+    try std.testing.expect(plane.is_emergency_recovery);
+    try std.testing.expectEqual(@as(f32, 15.0), plane.carrier_heal_duration);
+    try std.testing.expectEqual(@as(f32, 0.0), plane.speed);
+    try std.testing.expectEqual(@as(usize, 0), plane.target_carrier);
+    try std.testing.expect(!plane.is_dead);
+
+    const mid_deck = car_pos.add(up.scale(21.2)).add(fwd.scale(15.0));
+    try std.testing.expect(plane.pos.sub(mid_deck).len() < 0.01);
+
+    // Step for 10 seconds (600 steps)
+    const dt: f32 = 1.0 / 60.0;
+    var s: usize = 0;
+    while (s < 600) : (s += 1) {
+        plane.step(dt, .{}, &carriers);
+    }
+    // Still healing at 10s (since duration is 15s)
+    try std.testing.expectEqual(CarrierMode.healing, plane.carrier_mode);
+    try std.testing.expect(plane.is_emergency_recovery);
+    try std.testing.expect(plane.carrier_timer < 15.0);
+    try std.testing.expect(plane.health > 50.0);
+
+    // Step remaining 5+ seconds until 15s expires
+    while (plane.carrier_mode == .healing and s < 1200) : (s += 1) {
+        plane.step(dt, .{}, &carriers);
+    }
+
+    // Must reach 100% health and transition to takeoff_roll
+    try std.testing.expectEqual(100.0, plane.health);
+    try std.testing.expectEqual(CarrierMode.takeoff_roll, plane.carrier_mode);
+    try std.testing.expect(!plane.is_emergency_recovery);
+}
+
 

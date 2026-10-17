@@ -685,7 +685,7 @@ fn printHelp() void {
         \\  Simulated Lag Preset:    L  (Cycles LAN -> 35ms -> 85ms -> 175ms -> 320ms)
         \\  Carrier Deck Landing:    Stern Glide Slope < 70 m/s to arrest and reup health
         \\  Carrier Autopilot:       PRESS H or ` (Backtick) to toggle auto recovery & 5s recharge
-        \\  Emergency Respawn:       PRESS R (15s cooldown respawn timer for glitch recovery)
+        \\  Emergency Recovery:      PRESS R (Places plane on carrier craft for 15s to recover from glitches)
         \\
     ;
     std.debug.print("{s}", .{help_text});
@@ -1117,6 +1117,8 @@ pub fn main(init: std.process.Init.Minimal) !void {
     var announcement_len: usize = 0;
     var announcement_dirty: bool = false;
     var respawn_cooldown: f32 = 0.0;
+    var last_recovery_sec: u32 = 999;
+    var was_emergency_recovery: bool = false;
 
     if (std.c.getenv("AG_SHOWCASE")) |sc| {
         if (sc[0] == '1') showcase = true;
@@ -3165,24 +3167,22 @@ pub fn main(init: std.process.Init.Minimal) !void {
             }
         }
 
-        // Press 'R' for emergency respawn at nearest friendly Aircraft Carrier (15-second cooldown timer for glitch recovery)
+        // Press 'R' for emergency recovery at nearest friendly Aircraft Carrier:
+        // Places plane on the carrier craft for 15 seconds with live countdown timer!
         if (screen_state == .in_game and win.respawn_pressed) {
             win.respawn_pressed = false;
             if (respawn_cooldown <= 0.0) {
-                plane.carrier_mode = .free_flight;
-                plane.respawnNearestCarrier(world_objects.carriers[0..world_objects.carrier_count]);
-                cam.pos = plane.pos.sub(plane.dir.scale(16.0)).add(plane.pos.norm().scale(4.5));
+                plane.emergencyRecoverCarrier(world_objects.carriers[0..world_objects.carrier_count]);
                 respawn_cooldown = 15.0;
-                announcement_timer = 4.5;
-                announcement_len = setEmergencyRespawnAnnouncement(&announcement_buf);
-                announcement_dirty = true;
+                last_recovery_sec = 999;
+                announcement_timer = 1.0;
                 audio.global_audio.triggerTargetLockTone();
-                log.info("RESPAWN: Pilot emergency respawn deployed from friendly Aircraft Carrier (15s cooldown active)!", .{});
+                log.info("RESPAWN: Pilot initiated 15-second emergency recovery on carrier flight deck!", .{});
             } else {
                 announcement_timer = 2.5;
                 announcement_len = setRespawnCooldownAnnouncement(&announcement_buf, respawn_cooldown);
                 announcement_dirty = true;
-                log.info("RESPAWN: Emergency respawn on cooldown ({d:.1}s remaining).", .{respawn_cooldown});
+                log.info("RESPAWN: Emergency recovery on cooldown ({d:.1}s remaining).", .{respawn_cooldown});
             }
         }
 
@@ -3696,6 +3696,30 @@ pub fn main(init: std.process.Init.Minimal) !void {
             defer cs_b.deinit();
             try r.updateMesh(mesh_callsign_display, cs_b.verts.items, cs_b.indices.items);
         }
+
+        // Live countdown announcement while on the carrier craft during emergency recovery
+        if (plane.carrier_mode == .healing and plane.is_emergency_recovery) {
+            const rem_s = @max(0.0, plane.carrier_heal_duration - plane.carrier_timer);
+            const rem_sec: u32 = @intFromFloat(@ceil(rem_s));
+            if (rem_sec != last_recovery_sec) {
+                last_recovery_sec = rem_sec;
+                if (std.fmt.bufPrint(&announcement_buf, "EMERGENCY RECOVERY: {d} S", .{rem_sec})) |msg| {
+                    announcement_len = msg.len;
+                    announcement_dirty = true;
+                } else |_| {}
+            }
+            announcement_timer = 1.0;
+        }
+
+        if (was_emergency_recovery and !plane.is_emergency_recovery) {
+            if (std.fmt.bufPrint(&announcement_buf, "EMERGENCY RECOVERY COMPLETE // CATAPULT LAUNCH", .{})) |msg| {
+                announcement_len = msg.len;
+                announcement_dirty = true;
+            } else |_| {}
+            announcement_timer = 3.5;
+            audio.global_audio.triggerTargetLockTone();
+        }
+        was_emergency_recovery = (plane.carrier_mode == .healing and plane.is_emergency_recovery);
 
         if (announcement_dirty) {
             announcement_dirty = false;
@@ -4551,7 +4575,7 @@ pub fn main(init: std.process.Init.Minimal) !void {
                 .model = Mat4.model(banner_center, Vec3.init(0.85, 0.28, 0.85), hud_facing_rot, Vec3.init(0.35, 3.8, 3.2)),
             };
             n += 1;
-            const prog = math.clamp01(plane.carrier_timer / 5.0);
+            const prog = math.clamp01(plane.carrier_timer / plane.carrier_heal_duration);
             const max_bar_w: f32 = 0.36;
             const fill_w = @max(0.010, max_bar_w * prog);
             const bar_pos = banner_center.sub(cam_up_actual.scale(0.015)).sub(cam_right.scale((max_bar_w - fill_w) * 0.5));
