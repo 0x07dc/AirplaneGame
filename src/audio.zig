@@ -56,9 +56,9 @@ pub const AudioEngine = struct {
     engine_active: bool = false,
 
     // Elevator / Flight Lounge Music State
-    music_active: bool = true,
-    music_volume: f32 = 0.55,
-    music_cur_vol: f32 = 0.55,
+    music_active: bool = false,
+    music_volume: f32 = 0.35,
+    music_cur_vol: f32 = 0.0,
     music_time: f32 = 0.0,
     music_chord_phases: [4]f32 = [_]f32{0.0} ** 4,
     music_bass_phase: f32 = 0.0,
@@ -82,6 +82,9 @@ pub const AudioEngine = struct {
         defer self.mutex.unlock();
         self.music_active = active;
         self.music_volume = vol;
+        if (!active) {
+            self.music_cur_vol = 0.0;
+        }
     }
 
     pub fn setEngineActive(self: *AudioEngine, active: bool) void {
@@ -266,6 +269,7 @@ pub const AudioEngine = struct {
         self.mutex.lock();
         defer self.mutex.unlock();
 
+        self.engine_active = true;
         self.engine_speed_ratio = std.math.clamp(speed_ratio, 0.0, 1.5);
         self.engine_boost = if (is_boost) 1.0 else 0.0;
         self.engine_turb = std.math.clamp(turb, 0.0, 1.5);
@@ -304,8 +308,8 @@ pub const AudioEngine = struct {
             var boost_val: f32 = 0.0;
             var turb_val: f32 = 0.0;
             var eng_active: bool = false;
-            var mus_active: bool = true;
-            var mus_target_vol: f32 = 0.55;
+            var mus_active: bool = false;
+            var mus_target_vol: f32 = 0.35;
             {
                 self.mutex.lock();
                 speed_r = self.engine_speed_ratio;
@@ -321,9 +325,13 @@ pub const AudioEngine = struct {
                 var mix_l: f32 = 0.0;
                 var mix_r: f32 = 0.0;
 
-                // Smooth music volume crossfade
+                // Smooth music volume crossfade (instant silence when entering game or paused)
                 const target_v = if (mus_active) mus_target_vol else 0.0;
-                self.music_cur_vol += (target_v - self.music_cur_vol) * (dt * 4.0);
+                if (!mus_active) {
+                    self.music_cur_vol = 0.0;
+                } else {
+                    self.music_cur_vol += (target_v - self.music_cur_vol) * (dt * 12.0);
+                }
 
                 // 1. Inspiring Ready-To-Fly Elevator / Flight Lounge Music Synthesizer
                 if (self.music_cur_vol > 0.001) {
@@ -468,9 +476,10 @@ pub const AudioEngine = struct {
                     const lead_tone = @sin(self.music_lead_phase) * 0.75 + @sin(self.music_lead_phase * 3.0) * 0.15;
                     const lead_sig = lead_tone * 0.16 * lead_env;
 
-                    // Mix music bus into master channels
-                    const mus_l = (bass_sig + chord_sig * tremolo_l + kick_sig + snap_sig * 0.9 + hihat_sig * 0.8 + lead_sig * 0.95) * self.music_cur_vol;
-                    const mus_r = (bass_sig + chord_sig * tremolo_r + kick_sig + snap_sig * 1.1 + hihat_sig * 1.2 + lead_sig * 1.05) * self.music_cur_vol;
+                    // Mix music bus into master channels (scaled to preserve master headroom for SFX)
+                    const mus_scale: f32 = 0.35;
+                    const mus_l = (bass_sig + chord_sig * tremolo_l + kick_sig + snap_sig * 0.9 + hihat_sig * 0.8 + lead_sig * 0.95) * (self.music_cur_vol * mus_scale);
+                    const mus_r = (bass_sig + chord_sig * tremolo_r + kick_sig + snap_sig * 1.1 + hihat_sig * 1.2 + lead_sig * 1.05) * (self.music_cur_vol * mus_scale);
 
                     mix_l += mus_l;
                     mix_r += mus_r;

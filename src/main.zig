@@ -1981,6 +1981,7 @@ pub fn main(init: std.process.Init.Minimal) !void {
     var was_plane_dead: bool = false;
 
     var screen_state: GameScreen = if (showcase) .in_game else start_screen;
+    var prev_audio_screen: ?GameScreen = null;
     var title_menu_idx: usize = 0; // 0 = START GAME, 1 = QUIT GAME
     var main_menu_idx: usize = 0;
     var sp_setup_idx: usize = 0;
@@ -3047,6 +3048,25 @@ pub fn main(init: std.process.Init.Minimal) !void {
             }
         }
 
+        // Synchronize audio engine state with current game screen
+        if (screen_state != prev_audio_screen) {
+            prev_audio_screen = screen_state;
+            switch (screen_state) {
+                .in_game => {
+                    audio.global_audio.setMusicState(false, 0.0);
+                    audio.global_audio.setEngineActive(true);
+                },
+                .pause_menu, .controls_guide => {
+                    audio.global_audio.setMusicState(false, 0.0);
+                    audio.global_audio.setEngineActive(false);
+                },
+                .title_screen, .choose_callsign, .main_menu, .single_player_setup, .multiplayer_lobby, .direct_connect_setup, .game_over => {
+                    audio.global_audio.setMusicState(true, 0.35);
+                    audio.global_audio.setEngineActive(false);
+                },
+            }
+        }
+
         if (screen_state == .title_screen or screen_state == .choose_callsign or screen_state == .main_menu or screen_state == .single_player_setup or screen_state == .multiplayer_lobby or screen_state == .direct_connect_setup or screen_state == .game_over) {
             acc = 0;
             // Cinematic camera circling the friendly aircraft carrier
@@ -3312,7 +3332,11 @@ pub fn main(init: std.process.Init.Minimal) !void {
                 &net_hit_target_id,
                 &net_damage_dealt,
             );
-            audio.global_audio.updateEngine(@abs(plane.speed) / 380.0, input.boost, plane.turb);
+            if (plane.is_dead) {
+                audio.global_audio.setEngineActive(false);
+            } else {
+                audio.global_audio.updateEngine(@abs(plane.speed) / 380.0, input.boost, plane.turb);
+            }
             if (plane.is_dead and !was_plane_dead) {
                 audio.global_audio.triggerExplosion(true);
             }
@@ -3486,6 +3510,8 @@ pub fn main(init: std.process.Init.Minimal) !void {
                 game_over_dirty = true;
                 cam.zoom_active = false;
                 cam.fov = math.radians(65.0);
+                audio.global_audio.setEngineActive(false);
+                audio.global_audio.setMusicState(true, 0.35);
                 audio.global_audio.triggerTargetLockTone();
             }
 
