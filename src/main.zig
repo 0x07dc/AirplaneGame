@@ -5298,6 +5298,7 @@ pub fn main(init: std.process.Init.Minimal) !void {
                     }
                 }
             }
+        }
 
             // 10c. Screen-Space High-Visibility HUD Enemy Target Framing & Distance Readouts
             // Projects a crisp, constant-size emissive target box + range tag onto every visible enemy
@@ -5729,7 +5730,6 @@ pub fn main(init: std.process.Init.Minimal) !void {
                     }
                 }
             }
-        }
 
         // 11. Top-Right HUD Avionics Scoreboard (Personal, Blue Team, and Red Team)
         if (!cam.zoom_active and n + 32 <= max_draws) {
