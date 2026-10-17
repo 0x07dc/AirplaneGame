@@ -217,6 +217,19 @@
       box-shadow: 0 0 16px rgba(0, 255, 119, 0.35);
     }
 
+    .btn-github {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-bright);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .btn-github:hover {
+      background: rgba(255, 255, 255, 0.16);
+      border-color: rgba(255, 255, 255, 0.4);
+      color: #fff;
+    }
+
+
     /* =====================================================================
        HERO SECTION
        ===================================================================== */
@@ -633,6 +646,48 @@
       font-weight: 600;
     }
 
+    .pill-coming-soon {
+      display: inline-block;
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 0.12rem 0.48rem;
+      border-radius: 999px;
+      background: rgba(255, 170, 0, 0.16);
+      border: 1px solid rgba(255, 170, 0, 0.55);
+      color: #ffaa00;
+      margin-left: 0.45rem;
+      vertical-align: middle;
+      font-weight: 700;
+    }
+
+    .tab-notice {
+      background: rgba(255, 170, 0, 0.08);
+      border: 1px solid rgba(255, 170, 0, 0.35);
+      border-radius: var(--radius-sm);
+      padding: 0.95rem 1.25rem;
+      margin-bottom: 1.25rem;
+      color: #ffd280;
+      font-size: 0.88rem;
+      line-height: 1.55;
+    }
+
+    .tab-prereqs {
+      margin-top: 1.25rem;
+      padding: 0.85rem 1.15rem;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border-hud);
+      border-radius: var(--radius-sm);
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    .tab-prereqs strong {
+      color: var(--cyan-neon);
+    }
+
+
     .tab-pane {
       display: none;
       background: #040810;
@@ -976,6 +1031,12 @@
       </ul>
 
       <div class="nav-actions">
+        <a href="https://github.com/0x07dc/AirplaneGame" target="_blank" rel="noopener" class="btn btn-github">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+          </svg>
+          GitHub
+        </a>
         <!-- MANDATORY: Accessible contact trigger for modern dialog -->
         <button type="button" class="btn btn-contact" id="openContactBtn" aria-haspopup="dialog" aria-controls="contactModal">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1016,14 +1077,20 @@
               <polyline points="7 10 12 15 17 10"/>
               <line x1="12" y1="15" x2="12" y2="3"/>
             </svg>
-            Obtain on Linux
+            Install on Linux
           </a>
-          <button type="button" class="btn btn-tactical" id="heroContactBtn">
+          <a href="https://github.com/0x07dc/AirplaneGame" target="_blank" rel="noopener" class="btn btn-tactical">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+            </svg>
+            Public GitHub Repo
+          </a>
+          <button type="button" class="btn btn-contact" id="heroContactBtn">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
               <polyline points="22,6 12,13 2,6"/>
             </svg>
-            Contact Developer
+            Contact Dispatch
           </button>
         </div>
 
@@ -1293,9 +1360,9 @@
 
       <div class="tab-bar" role="tablist">
         <button type="button" class="tab-btn active" role="tab" aria-selected="true" data-tab="tab-arch">Arch / Manjaro (Pacman)</button>
-        <button type="button" class="tab-btn" role="tab" aria-selected="false" data-tab="tab-flatpak">Flatpak / Flathub</button>
-        <button type="button" class="tab-btn" role="tab" aria-selected="false" data-tab="tab-portable">Portable Linux Binary</button>
+        <button type="button" class="tab-btn" role="tab" aria-selected="false" data-tab="tab-flatpak">Flatpak <span class="pill-coming-soon">Coming Soon</span></button>
         <button type="button" class="tab-btn" role="tab" aria-selected="false" data-tab="tab-source">Build from Source</button>
+        <button type="button" class="tab-btn" role="tab" aria-selected="false" data-tab="tab-portable">Portable Linux Binary</button>
       </div>
 
       <div id="tab-arch" class="tab-pane active" role="tabpanel">
@@ -1305,27 +1372,73 @@
           <button type="button" class="copy-btn" onclick="copySnippet('sudo pacman -U https://github.com/0x07dc/AirplaneGame/releases/download/v0.1.0/airplane-game-0.1.0-1-x86_64.pkg.tar.zst', this)">Copy</button>
         </div>
 
-        <p style="color: var(--text-muted); margin: 1.25rem 0 0.75rem;"><strong>Build Locally via PKGBUILD:</strong></p>
+        <p style="color: var(--text-muted); margin: 1.25rem 0 0.75rem;"><strong>Build &amp; Install Locally via PKGBUILD from Public GitHub:</strong></p>
         <div class="cmd-line">
           <code>git clone https://github.com/0x07dc/AirplaneGame.git &amp;&amp; cd AirplaneGame/dist/arch &amp;&amp; makepkg -si</code>
           <button type="button" class="copy-btn" onclick="copySnippet('git clone https://github.com/0x07dc/AirplaneGame.git && cd AirplaneGame/dist/arch && makepkg -si', this)">Copy</button>
         </div>
+
+        <p style="color: var(--text-muted); margin: 1.25rem 0 0.75rem;"><strong>Launch Game:</strong></p>
+        <div class="cmd-line">
+          <code>airplane_game</code>
+          <button type="button" class="copy-btn" onclick="copySnippet('airplane_game', this)">Copy</button>
+        </div>
       </div>
 
       <div id="tab-flatpak" class="tab-pane" role="tabpanel">
-        <p style="color: var(--text-muted); margin-bottom: 0.75rem;">Universal sandboxed package for Fedora, Ubuntu, Debian, openSUSE, and Steam Deck:</p>
+        <div class="tab-notice">
+          <strong style="color: #ffaa00;">⏳ Flathub Review in Progress:</strong> The official Flathub sandbox package (<code>io.github._0x07dc.AirplaneGame</code>) is coming soon! Once approved by Flathub administrators, it will be installable with 1-click across Fedora, Ubuntu, Debian, openSUSE, and Steam Deck.
+        </div>
+
+        <p style="color: var(--text-muted); margin-bottom: 0.75rem;"><strong>Build &amp; Run Flatpak Locally (from public repository):</strong></p>
         <div class="cmd-line">
-          <code>flatpak install flathub io.github._0x07dc.AirplaneGame</code>
-          <button type="button" class="copy-btn" onclick="copySnippet('flatpak install flathub io.github._0x07dc.AirplaneGame', this)">Copy</button>
+          <code>git clone https://github.com/0x07dc/AirplaneGame.git &amp;&amp; cd AirplaneGame</code>
+          <button type="button" class="copy-btn" onclick="copySnippet('git clone https://github.com/0x07dc/AirplaneGame.git && cd AirplaneGame', this)">Copy</button>
+        </div>
+        <div class="cmd-line">
+          <code>flatpak-builder --user --install --force-clean build-dir dist/flatpak/io.github._0x07dc.AirplaneGame.json</code>
+          <button type="button" class="copy-btn" onclick="copySnippet('flatpak-builder --user --install --force-clean build-dir dist/flatpak/io.github._0x07dc.AirplaneGame.json', this)">Copy</button>
         </div>
         <div class="cmd-line">
           <code>flatpak run io.github._0x07dc.AirplaneGame</code>
           <button type="button" class="copy-btn" onclick="copySnippet('flatpak run io.github._0x07dc.AirplaneGame', this)">Copy</button>
         </div>
+
+        <p style="color: var(--text-muted); margin: 1.25rem 0 0.75rem;"><strong>Upcoming Flathub Command:</strong></p>
+        <div class="cmd-line">
+          <code>flatpak install flathub io.github._0x07dc.AirplaneGame</code>
+          <button type="button" class="copy-btn" onclick="copySnippet('flatpak install flathub io.github._0x07dc.AirplaneGame', this)">Copy</button>
+        </div>
+      </div>
+
+      <div id="tab-source" class="tab-pane" role="tabpanel">
+        <p style="color: var(--text-muted); margin-bottom: 0.75rem;"><strong>Clone &amp; Compile from Public GitHub:</strong> Build natively with full LLVM LTO and SIMD vectorization via Zig 0.16.0:</p>
+        <div class="cmd-line">
+          <code>git clone https://github.com/0x07dc/AirplaneGame.git &amp;&amp; cd AirplaneGame</code>
+          <button type="button" class="copy-btn" onclick="copySnippet('git clone https://github.com/0x07dc/AirplaneGame.git && cd AirplaneGame', this)">Copy</button>
+        </div>
+        <div class="cmd-line">
+          <code>zig build -Doptimize=ReleaseFast</code>
+          <button type="button" class="copy-btn" onclick="copySnippet('zig build -Doptimize=ReleaseFast', this)">Copy</button>
+        </div>
+        <div class="cmd-line">
+          <code>./zig-out/bin/airplane_game</code>
+          <button type="button" class="copy-btn" onclick="copySnippet('./zig-out/bin/airplane_game', this)">Copy</button>
+        </div>
+
+        <p style="color: var(--text-muted); margin: 1.25rem 0 0.75rem;"><strong>Run Headroom &amp; Stutter Benchmark Diagnostic:</strong></p>
+        <div class="cmd-line">
+          <code>./zig-out/bin/airplane_game --benchmark 60</code>
+          <button type="button" class="copy-btn" onclick="copySnippet('./zig-out/bin/airplane_game --benchmark 60', this)">Copy</button>
+        </div>
+
+        <div class="tab-prereqs">
+          <strong>System Build Dependencies:</strong> Zig 0.16.0 compiler, Wayland client libraries (<code>libwayland-client</code>), Vulkan 1.3 ICD loader &amp; drivers (Mesa RADV/ANV / NVIDIA), and ALSA development sound libraries (<code>libasound2-dev</code> / <code>alsa-lib</code>).
+        </div>
       </div>
 
       <div id="tab-portable" class="tab-pane" role="tabpanel">
-        <p style="color: var(--text-muted); margin-bottom: 0.75rem;">Download and run the standalone portable Linux x86_64 bundle (No dependencies to install):</p>
+        <p style="color: var(--text-muted); margin-bottom: 0.75rem;"><strong>Download &amp; Run Portable Linux x86_64 Bundle:</strong> Zero package managers or toolchains required:</p>
         <div class="cmd-line">
           <code>curl -LO https://github.com/0x07dc/AirplaneGame/releases/download/v0.1.0/airplane-game-0.1.0-linux-x86_64.tar.gz</code>
           <button type="button" class="copy-btn" onclick="copySnippet('curl -LO https://github.com/0x07dc/AirplaneGame/releases/download/v0.1.0/airplane-game-0.1.0-linux-x86_64.tar.gz', this)">Copy</button>
@@ -1333,18 +1446,6 @@
         <div class="cmd-line">
           <code>tar -xzf airplane-game-0.1.0-linux-x86_64.tar.gz &amp;&amp; cd airplane_game-0.1.0 &amp;&amp; ./airplane_game</code>
           <button type="button" class="copy-btn" onclick="copySnippet('tar -xzf airplane-game-0.1.0-linux-x86_64.tar.gz && cd airplane_game-0.1.0 && ./airplane_game', this)">Copy</button>
-        </div>
-      </div>
-
-      <div id="tab-source" class="tab-pane" role="tabpanel">
-        <p style="color: var(--text-muted); margin-bottom: 0.75rem;">Compile with full LLVM LTO and SIMD optimizations via Zig 0.16.0:</p>
-        <div class="cmd-line">
-          <code>zig build -Doptimize=ReleaseFast</code>
-          <button type="button" class="copy-btn" onclick="copySnippet('zig build -Doptimize=ReleaseFast', this)">Copy</button>
-        </div>
-        <div class="cmd-line">
-          <code>./zig-out/bin/airplane_game --benchmark</code>
-          <button type="button" class="copy-btn" onclick="copySnippet('./zig-out/bin/airplane_game --benchmark', this)">Copy</button>
         </div>
       </div>
     </div>
@@ -1594,7 +1695,8 @@
           <h4>Distribution</h4>
           <ul>
             <li><a href="#install">Arch Linux (Pacman)</a></li>
-            <li><a href="#install">Flatpak (Flathub)</a></li>
+            <li><a href="#install">Flatpak (Coming Soon)</a></li>
+            <li><a href="#install">Build from Source</a></li>
             <li><a href="#controls">Flight Doctrine</a></li>
             <li><a href="#" id="footerContactBtn">Contact Dispatch</a></li>
           </ul>
