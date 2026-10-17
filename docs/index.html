@@ -1292,25 +1292,28 @@
       </div>
 
       <div class="tab-bar" role="tablist">
-        <button type="button" class="tab-btn active" role="tab" aria-selected="true" data-tab="tab-arch">Arch / Manjaro (AUR)</button>
+        <button type="button" class="tab-btn active" role="tab" aria-selected="true" data-tab="tab-arch">Arch / Manjaro (Pacman)</button>
         <button type="button" class="tab-btn" role="tab" aria-selected="false" data-tab="tab-flatpak">Flatpak / Flathub</button>
+        <button type="button" class="tab-btn" role="tab" aria-selected="false" data-tab="tab-portable">Portable Linux Binary</button>
         <button type="button" class="tab-btn" role="tab" aria-selected="false" data-tab="tab-source">Build from Source</button>
       </div>
 
       <div id="tab-arch" class="tab-pane active" role="tabpanel">
-        <p style="color: var(--text-muted); margin-bottom: 1rem;">Install directly from the Arch User Repository using yay or paru:</p>
+        <p style="color: var(--text-muted); margin-bottom: 0.75rem;"><strong>Direct Native Installation (Zero AUR Account Required):</strong> Install the pre-built native package directly with <code>pacman</code>:</p>
         <div class="cmd-line">
-          <code>yay -S airplane-game</code>
-          <button type="button" class="copy-btn" onclick="copySnippet('yay -S airplane-game', this)">Copy</button>
+          <code>sudo pacman -U https://github.com/0x07dc/AirplaneGame/releases/download/v0.1.0/airplane-game-0.1.0-1-x86_64.pkg.tar.zst</code>
+          <button type="button" class="copy-btn" onclick="copySnippet('sudo pacman -U https://github.com/0x07dc/AirplaneGame/releases/download/v0.1.0/airplane-game-0.1.0-1-x86_64.pkg.tar.zst', this)">Copy</button>
         </div>
+
+        <p style="color: var(--text-muted); margin: 1.25rem 0 0.75rem;"><strong>Build Locally via PKGBUILD:</strong></p>
         <div class="cmd-line">
-          <code>yay -S airplane-game-git   # Cutting-edge main branch</code>
-          <button type="button" class="copy-btn" onclick="copySnippet('yay -S airplane-game-git', this)">Copy</button>
+          <code>git clone https://github.com/0x07dc/AirplaneGame.git &amp;&amp; cd AirplaneGame/dist/arch &amp;&amp; makepkg -si</code>
+          <button type="button" class="copy-btn" onclick="copySnippet('git clone https://github.com/0x07dc/AirplaneGame.git && cd AirplaneGame/dist/arch && makepkg -si', this)">Copy</button>
         </div>
       </div>
 
       <div id="tab-flatpak" class="tab-pane" role="tabpanel">
-        <p style="color: var(--text-muted); margin-bottom: 1rem;">Universal sandboxed package for Fedora, Ubuntu, Debian, and openSUSE:</p>
+        <p style="color: var(--text-muted); margin-bottom: 0.75rem;">Universal sandboxed package for Fedora, Ubuntu, Debian, openSUSE, and Steam Deck:</p>
         <div class="cmd-line">
           <code>flatpak install flathub io.github._0x07dc.AirplaneGame</code>
           <button type="button" class="copy-btn" onclick="copySnippet('flatpak install flathub io.github._0x07dc.AirplaneGame', this)">Copy</button>
@@ -1321,8 +1324,20 @@
         </div>
       </div>
 
+      <div id="tab-portable" class="tab-pane" role="tabpanel">
+        <p style="color: var(--text-muted); margin-bottom: 0.75rem;">Download and run the standalone portable Linux x86_64 bundle (No dependencies to install):</p>
+        <div class="cmd-line">
+          <code>curl -LO https://github.com/0x07dc/AirplaneGame/releases/download/v0.1.0/airplane-game-0.1.0-linux-x86_64.tar.gz</code>
+          <button type="button" class="copy-btn" onclick="copySnippet('curl -LO https://github.com/0x07dc/AirplaneGame/releases/download/v0.1.0/airplane-game-0.1.0-linux-x86_64.tar.gz', this)">Copy</button>
+        </div>
+        <div class="cmd-line">
+          <code>tar -xzf airplane-game-0.1.0-linux-x86_64.tar.gz &amp;&amp; cd airplane_game-0.1.0 &amp;&amp; ./airplane_game</code>
+          <button type="button" class="copy-btn" onclick="copySnippet('tar -xzf airplane-game-0.1.0-linux-x86_64.tar.gz && cd airplane_game-0.1.0 && ./airplane_game', this)">Copy</button>
+        </div>
+      </div>
+
       <div id="tab-source" class="tab-pane" role="tabpanel">
-        <p style="color: var(--text-muted); margin-bottom: 1rem;">Compile with full LLVM LTO and SIMD optimizations via Zig 0.16.0:</p>
+        <p style="color: var(--text-muted); margin-bottom: 0.75rem;">Compile with full LLVM LTO and SIMD optimizations via Zig 0.16.0:</p>
         <div class="cmd-line">
           <code>zig build -Doptimize=ReleaseFast</code>
           <button type="button" class="copy-btn" onclick="copySnippet('zig build -Doptimize=ReleaseFast', this)">Copy</button>
@@ -1542,7 +1557,7 @@
         <div class="footer-col">
           <h4>Distribution</h4>
           <ul>
-            <li><a href="#install">Arch Linux (AUR)</a></li>
+            <li><a href="#install">Arch Linux (Pacman)</a></li>
             <li><a href="#install">Flatpak (Flathub)</a></li>
             <li><a href="#controls">Flight Doctrine</a></li>
             <li><a href="#" id="footerContactBtn">Contact Dispatch</a></li>

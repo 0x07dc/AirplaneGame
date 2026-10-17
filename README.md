@@ -82,26 +82,28 @@ Whether performing 90-degree knife-edge mountain flybys at 3,800 m/s, locking on
 
 Airplane Combat Simulator is prepared for distribution via **Flatpak (Flathub)** and the **Arch User Repository (AUR)**.
 
-### Arch Linux, Manjaro & EndeavourOS (AUR)
+### Arch Linux, Manjaro & EndeavourOS
 
-Install directly from the Arch User Repository using your favorite AUR helper:
+#### Option 1: Direct Native Package (Zero AUR Account Required)
+Install the pre-built native package directly with `pacman`:
+```bash
+sudo pacman -U https://github.com/0x07dc/AirplaneGame/releases/download/v0.1.0/airplane-game-0.1.0-1-x86_64.pkg.tar.zst
+```
 
+#### Option 2: Build Locally via PKGBUILD
+```bash
+git clone https://github.com/0x07dc/AirplaneGame.git
+cd AirplaneGame/dist/arch
+makepkg -si
+```
+
+#### Option 3: Arch User Repository (AUR)
 ```bash
 # Using yay (Stable Release)
 yay -S airplane-game
 
 # Or the cutting-edge Git development release:
 yay -S airplane-game-git
-
-# Using paru
-paru -S airplane-game
-```
-
-#### Manual AUR Installation
-```bash
-git clone https://aur.archlinux.org/airplane-game.git
-cd airplane-game
-makepkg -si
 ```
 
 ---
