@@ -765,6 +765,16 @@ fn setPlayerJoinedAnnouncement(buf: *[48]u8, name: []const u8) usize {
     }
 }
 
+fn setCarrierLandingAnnouncement(buf: *[48]u8, carrier_idx: usize) usize {
+    if (std.fmt.bufPrint(buf, "AUTOPILOT: CARRIER #{d} RECOVERY", .{carrier_idx + 1})) |msg| {
+        return msg.len;
+    } else |_| {
+        const fallback = "AUTOPILOT: CARRIER RECOVERY";
+        @memcpy(buf[0..fallback.len], fallback);
+        return fallback.len;
+    }
+}
+
 const BenchmarkSample = struct {
     frame_time_ms: f64,
     cpu_sim_ms: f64,
@@ -1828,7 +1838,7 @@ pub fn main(init: std.process.Init.Minimal) !void {
         "HEAVY BOMBS       : RIGHT CTRL  OR  C (GROUND BASES & BLIMP)",
         "COCKPIT ZOOM      : Z (DECLUTTERS HUD WHILE ZOOMED)",
         "TRANSMISSION GEAR : 1 TO 9 (SPEEDS 20..3800 M/S), 0 (REVERSE)",
-        "CARRIER LANDING   : STERN APPROACH < 70 M/S TO LAND & REPAIR",
+        "CARRIER RECOVERY  : PRESS H  OR  ` (AUTOPILOT LANDING & RECHARGE)",
     };
     var mesh_guide_rows: [10]*const gfx.Mesh = undefined;
     for (guide_entries, 0..) |entry_txt, gi| {
@@ -3106,11 +3116,16 @@ pub fn main(init: std.process.Init.Minimal) !void {
             });
         }
 
-        // Press '`' (backtick/grave) to auto-land on the nearest friendly (Blue Team) Aircraft Carrier, restore health, and catapult launch!
-        if (screen_state == .in_game and win.grave_pressed) {
+        // Press 'H' or '`' (backtick/grave) to auto-land on the nearest friendly (Blue Team) Aircraft Carrier, restore health, and catapult launch!
+        if (screen_state == .in_game and (win.grave_pressed or win.h_pressed)) {
             win.grave_pressed = false;
+            win.h_pressed = false;
             if (plane.beginCarrierLanding(world_objects.carriers[0..world_objects.carrier_count])) |cidx| {
-                log.info("engaging auto-landing sequence onto friendly Aircraft Carrier #{d} (current health {d:.0}%)", .{
+                announcement_timer = 5.0;
+                announcement_len = setCarrierLandingAnnouncement(&announcement_buf, cidx);
+                announcement_dirty = true;
+                audio.global_audio.triggerTargetLockTone();
+                log.info("AUTOPILOT: Engaging carrier recovery sequence onto friendly Aircraft Carrier #{d} (current health {d:.0}%)", .{
                     cidx,
                     plane.health,
                 });
@@ -3309,9 +3324,15 @@ pub fn main(init: std.process.Init.Minimal) !void {
                 }
             }
 
-            const fire_l = !plane.is_dead and (win.down(.enter) or win.enter_pressed);
-            const fire_r = !plane.is_dead and (win.down(.right_shift) or win.right_shift_pressed);
-            const fire_bomb = !plane.is_dead and (win.down(.c_key) or win.down(.right_ctrl) or win.bomb_pressed);
+            // Catapult launch steam blast when departing carrier
+            if (prev_carrier_mode == .healing and plane.carrier_mode == .takeoff_roll) {
+                audio.global_audio.triggerBombDrop();
+            }
+
+            const can_fire = !plane.is_dead and plane.carrier_mode == .free_flight;
+            const fire_l = can_fire and (win.down(.enter) or win.enter_pressed);
+            const fire_r = can_fire and (win.down(.right_shift) or win.right_shift_pressed);
+            const fire_bomb = can_fire and (win.down(.c_key) or win.down(.right_ctrl) or win.bomb_pressed);
             win.mouse_left_clicked = false;
             win.mouse_right_clicked = false;
             win.enter_pressed = false;
@@ -3332,7 +3353,7 @@ pub fn main(init: std.process.Init.Minimal) !void {
                 &net_hit_target_id,
                 &net_damage_dealt,
             );
-            if (plane.is_dead) {
+            if (plane.is_dead or plane.carrier_mode == .healing) {
                 audio.global_audio.setEngineActive(false);
             } else {
                 audio.global_audio.updateEngine(@abs(plane.speed) / 380.0, input.boost, plane.turb);
@@ -4480,7 +4501,7 @@ pub fn main(init: std.process.Init.Minimal) !void {
                 .model = Mat4.model(banner_center, Vec3.init(0.85, 0.28, 0.85), hud_facing_rot, Vec3.init(0.35, 3.8, 3.2)),
             };
             n += 1;
-            const prog = math.clamp01(plane.health / plane.max_health);
+            const prog = math.clamp01(plane.carrier_timer / 5.0);
             const max_bar_w: f32 = 0.36;
             const fill_w = @max(0.010, max_bar_w * prog);
             const bar_pos = banner_center.sub(cam_up_actual.scale(0.015)).sub(cam_right.scale((max_bar_w - fill_w) * 0.5));

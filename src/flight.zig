@@ -517,11 +517,25 @@ pub const Plane = struct {
                 const waypoint = if (dist > 1100.0) entry_gate else stern_point;
                 const to_wp = waypoint.sub(self.pos);
                 const wp_dist = @max(to_wp.len(), 1.0);
-                const desired_dir = to_wp.scale(1.0 / wp_dist);
+                const direct_dir = to_wp.scale(1.0 / wp_dist);
+
+                // Spherical curvature & horizon guidance: when far away or occluded by the planet,
+                // steer tangentially along the spherical surface at cruise altitude rather than digging into terrain.
+                const rel = planet.evalTargetRel(self.pos, waypoint);
+                const transit_blend: f32 = if (rel.is_occluded)
+                    1.0
+                else
+                    math.clamp01((dist - 1400.0) / 1600.0);
+
+                const cruise_alt = math.lerpf(160.0 + deck_height, 380.0, transit_blend);
+                const desired_dir = if (transit_blend > 0.01)
+                    Vec3.lerp(direct_dir, rel.tangent_dir, transit_blend).norm()
+                else
+                    direct_dir;
 
                 // Smoothly steer velocity & orientation toward waypoint (or carrier runway alignment when close)
                 const align_t = math.clamp01(1.0 - dist / 900.0);
-                const look_fwd = Vec3.lerp(desired_dir, car.fwd, align_t * 0.75).norm();
+                const look_fwd = Vec3.lerp(desired_dir, car.fwd, align_t * 0.85).norm();
                 const up_now = self.pos.norm();
                 const z_axis = look_fwd.scale(-1);
                 const x_axis = up_now.cross(z_axis).norm();
@@ -531,8 +545,8 @@ pub const Plane = struct {
                 self.rot = Quat.nlerp(self.rot, target_rot, 1.0 - @exp(-8.0 * dt));
                 self.dir = Vec3.lerp(self.dir, desired_dir, 1.0 - @exp(-9.0 * dt)).norm();
 
-                // Decelerate from cruise/boost down to approach speed as we near the stern
-                const target_spd = math.lerpf(420.0, 2600.0, math.clamp01((dist - 120.0) / 3200.0));
+                // Decelerate from supersonic transit down to approach speed as we near the stern
+                const target_spd = math.lerpf(420.0, 2400.0, math.clamp01((dist - 140.0) / 2800.0));
                 self.speed = math.lerpf(self.speed, target_spd, 1.0 - @exp(-4.0 * dt));
 
                 const step_dist = self.speed * dt;
@@ -547,10 +561,12 @@ pub const Plane = struct {
                     self.deck_progress = 0;
                 } else {
                     self.pos = self.pos.add(desired_dir.scale(step_dist));
-                    // Keep above ocean surface during long-range approach
+                    // Maintain safe altitude during transit, smoothly descending as we enter final approach
                     const u = self.pos.norm();
-                    const min_r = planet.surfaceRadius(u) + deck_height;
-                    if (self.pos.len() < min_r) self.pos = u.scale(min_r);
+                    const min_r = planet.surfaceRadius(u) + (if (transit_blend > 0.05) cruise_alt else deck_height);
+                    if (self.pos.len() < min_r) {
+                        self.pos = u.scale(min_r);
+                    }
                 }
                 self.alt_agl = self.pos.len() - planet.radius;
             },
@@ -577,15 +593,16 @@ pub const Plane = struct {
                 }
             },
             .healing => {
-                // Parked on the flight deck: active re-up & health restoration animation over 3.2 seconds
+                // Parked on the flight deck: spend exactly 5.0 seconds recharging health to 100%
                 self.carrier_timer += dt;
                 self.pos = mid_deck;
                 self.rot = car.rot;
                 self.dir = car.fwd;
                 self.speed = 0;
                 self.alt_agl = deck_height;
-                self.health = @min(self.max_health, self.health + 35.0 * dt);
-                if (self.carrier_timer >= 3.2 and self.health >= self.max_health) {
+                const heal_duration: f32 = 5.0;
+                self.health = @min(self.max_health, self.health + (self.max_health / heal_duration) * dt);
+                if (self.carrier_timer >= heal_duration) {
                     self.health = self.max_health;
                     self.carrier_mode = .takeoff_roll;
                     self.carrier_timer = 0;
@@ -1355,5 +1372,83 @@ test "assisted bezier auto-guide fbw limits g-load and bleeds induced drag" {
     try std.testing.expect(plane.g_load <= 9.25);
     // FBW induced drag bleed should have bled some kinetic energy
     try std.testing.expect(plane.speed < initial_speed);
+}
+
+test "carrier auto-pilot recovery sequence: approach, 5-second recharge, and catapult takeoff" {
+    var plane = Plane{};
+    const up = Vec3.init(0, 1, 0);
+    const fwd = Vec3.init(0, 0, 1);
+    const right = Vec3.init(1, 0, 0);
+    const car_pos = up.scale(planet.radius);
+    const carriers = [_]planet.AircraftCarrier{.{
+        .pos = car_pos,
+        .dir = up,
+        .fwd = fwd,
+        .right = right,
+        .rot = planet.fromBasis(right, up, fwd.scale(-1.0)),
+        .team = .friendly,
+        .color = Vec3.init(0.2, 0.5, 1.0),
+    }};
+
+    // Spawn plane in free flight, damaged at 25% health
+    plane.spawnAt(up, fwd);
+    plane.health = 25.0;
+    try std.testing.expectEqual(CarrierMode.free_flight, plane.carrier_mode);
+
+    // 1. Engage carrier recovery
+    const cidx = plane.beginCarrierLanding(&carriers);
+    try std.testing.expectEqual(@as(?usize, 0), cidx);
+    try std.testing.expectEqual(CarrierMode.approach, plane.carrier_mode);
+
+    // Place plane on final approach 450m behind stern
+    const deck_h: f32 = 21.2;
+    const stern = car_pos.add(up.scale(deck_h)).sub(fwd.scale(155.0));
+    plane.pos = stern.sub(fwd.scale(450.0)).add(up.scale(40.0));
+    plane.speed = 420.0;
+    const dt: f32 = 1.0 / 60.0;
+
+    // Step until touchdown and landing roll
+    var steps: usize = 0;
+    while (plane.carrier_mode == .approach and steps < 600) : (steps += 1) {
+        plane.step(dt, .{}, &carriers);
+    }
+    try std.testing.expectEqual(CarrierMode.landing_roll, plane.carrier_mode);
+
+    // Step through landing roll (arrestor wire deceleration ~1.45s)
+    steps = 0;
+    while (plane.carrier_mode == .landing_roll and steps < 200) : (steps += 1) {
+        plane.step(dt, .{}, &carriers);
+    }
+    try std.testing.expectEqual(CarrierMode.healing, plane.carrier_mode);
+    try std.testing.expect(plane.speed == 0.0);
+
+    // 2. Exactly 5.0 seconds of recharging
+    // At 2.5 seconds (150 steps), should still be healing and health should have climbed
+    var heal_steps: usize = 0;
+    while (heal_steps < 150) : (heal_steps += 1) {
+        plane.step(dt, .{}, &carriers);
+    }
+    try std.testing.expectEqual(CarrierMode.healing, plane.carrier_mode);
+    try std.testing.expect(plane.health > 50.0);
+    try std.testing.expect(plane.carrier_timer < 5.0);
+
+    // Step remaining 2.5 seconds (total 5.0 seconds)
+    while (plane.carrier_mode == .healing and heal_steps < 350) : (heal_steps += 1) {
+        plane.step(dt, .{}, &carriers);
+    }
+
+    // 3. At 5.0 seconds, health must be 100% and mode must transition to takeoff_roll
+    try std.testing.expectEqual(100.0, plane.health);
+    try std.testing.expectEqual(CarrierMode.takeoff_roll, plane.carrier_mode);
+
+    // Step through catapult launch and climb-out (~2.65s = 160 steps)
+    var takeoff_steps: usize = 0;
+    while (plane.carrier_mode == .takeoff_roll and takeoff_steps < 300) : (takeoff_steps += 1) {
+        plane.step(dt, .{}, &carriers);
+    }
+
+    // Must return to free flight at cruise speed
+    try std.testing.expectEqual(CarrierMode.free_flight, plane.carrier_mode);
+    try std.testing.expect(plane.speed >= 1200.0);
 }
 
