@@ -44,4 +44,4 @@ modules:
       - type: git
         url: https://github.com/0x07dc/AirplaneGame.git
         tag: v0.1.0
-        commit: 8405345286e4b448ece99a78ff08c805def32c31
+        commit: cb3657e717c6e24ac9511c7517b3fe696d1a314d
