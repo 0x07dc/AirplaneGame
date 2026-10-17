@@ -1,0 +1,45 @@
+app-id: io.github._0x07dc.AirplaneGame
+runtime: org.freedesktop.Platform
+runtime-version: '24.08'
+sdk: org.freedesktop.Sdk
+command: airplane_game
+
+finish-args:
+  # Wayland display server
+  - --socket=wayland
+  # Vulkan / DRI direct hardware acceleration
+  - --device=dri
+  # Audio playback (PulseAudio/PipeWire ALSA emulation)
+  - --socket=pulseaudio
+  # Shared memory IPC
+  - --share=ipc
+  # Multiplayer UDP networking
+  - --share=network
+
+modules:
+  - name: zig
+    buildsystem: simple
+    build-commands:
+      - install -dm755 /app/zig
+      - cp -a . /app/zig/
+      - ln -sf /app/zig/zig /app/bin/zig
+    sources:
+      - type: archive
+        only-arches: [x86_64]
+        url: https://ziglang.org/download/0.13.0/zig-linux-x86_64-0.13.0.tar.xz
+        sha256: d4529d20c548170256cf46eb61fa40ca798056db695843a89045b84931ae3f36
+      - type: archive
+        only-arches: [aarch64]
+        url: https://ziglang.org/download/0.13.0/zig-linux-aarch64-0.13.0.tar.xz
+        sha256: e85633df31b742b87ffea9db9403dbe9273c38db5d8bc15efae5dd1367a7fc1c
+    cleanup:
+      - /app/zig
+
+  - name: airplane-game
+    buildsystem: simple
+    build-commands:
+      - /app/bin/zig build --prefix /app -Doptimize=ReleaseFast -Duse-precompiled-shaders=true
+      - install -Dm644 LICENSE /app/share/licenses/io.github._0x07dc.AirplaneGame/LICENSE
+    sources:
+      - type: dir
+        path: ../../

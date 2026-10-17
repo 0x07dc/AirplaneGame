@@ -66,8 +66,27 @@ pub const Renderer = struct {
     layout: c.VkPipelineLayout = null,
     pipeline: c.VkPipeline = null,
     mem_props: c.VkPhysicalDeviceMemoryProperties = undefined,
-    meshes: [16]Mesh = [_]Mesh{.{}} ** 16,
+    meshes: [384]Mesh = [_]Mesh{.{}} ** 384,
     mesh_count: usize = 0,
+    last_image_idx: u32 = 0,
+    uncapped: bool = false,
+    actual_present_mode: c.VkPresentModeKHR = c.VK_PRESENT_MODE_FIFO_KHR,
+    gpu_name: [256]u8 = [_]u8{0} ** 256,
+
+    pub const FrameTiming = struct {
+        gpu_wait_ms: f32 = 0.0,
+        acquire_ms: f32 = 0.0,
+        record_ms: f32 = 0.0,
+        submit_ms: f32 = 0.0,
+        present_ms: f32 = 0.0,
+    };
+    pub var last_frame_timing: FrameTiming = .{};
+
+    fn getMonotonicNs() u64 {
+        var ts: c.struct_timespec = undefined;
+        _ = c.clock_gettime(c.CLOCK_MONOTONIC, &ts);
+        return @as(u64, @intCast(ts.tv_sec)) * 1_000_000_000 + @as(u64, @intCast(ts.tv_nsec));
+    }
 
     pub fn init(self: *Renderer, win: *Window) !void {
         const app_info = c.VkApplicationInfo{
@@ -130,7 +149,11 @@ pub const Renderer = struct {
         if (!found) return error.NoSuitableGpu;
         var props: c.VkPhysicalDeviceProperties = undefined;
         c.vkGetPhysicalDeviceProperties(self.phys, &props);
-        log.info("GPU: {s}", .{@as([*:0]const u8, @ptrCast(&props.deviceName))});
+        const dev_name = std.mem.span(@as([*:0]const u8, @ptrCast(&props.deviceName)));
+        const copy_l = @min(dev_name.len, self.gpu_name.len - 1);
+        @memcpy(self.gpu_name[0..copy_l], dev_name[0..copy_l]);
+        self.gpu_name[copy_l] = 0;
+        log.info("GPU: {s}", .{self.gpu_name[0..copy_l]});
         c.vkGetPhysicalDeviceMemoryProperties(self.phys, &self.mem_props);
 
         const prio: f32 = 1.0;
@@ -222,6 +245,24 @@ pub const Renderer = struct {
         m.index_count = @intCast(indices.len);
         self.mesh_count += 1;
         return m;
+    }
+
+    /// Update an existing mesh in-place. Waits for GPU idle, destroys old buffers and re-allocates.
+    pub fn updateMesh(self: *Renderer, m_in: *const Mesh, verts: []const mesh_mod.Vertex, indices: []const u32) !void {
+        _ = c.vkDeviceWaitIdle(self.device);
+        const m: *Mesh = @constCast(m_in);
+        if (m.vbuf != null) c.vkDestroyBuffer(self.device, m.vbuf, null);
+        if (m.vmem != null) c.vkFreeMemory(self.device, m.vmem, null);
+        if (m.ibuf != null) c.vkDestroyBuffer(self.device, m.ibuf, null);
+        if (m.imem != null) c.vkFreeMemory(self.device, m.imem, null);
+        m.vbuf = null;
+        m.vmem = null;
+        m.ibuf = null;
+        m.imem = null;
+        m.index_count = 0;
+        try self.createHostBuffer(std.mem.sliceAsBytes(verts), c.VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, &m.vbuf, &m.vmem);
+        try self.createHostBuffer(std.mem.sliceAsBytes(indices), c.VK_BUFFER_USAGE_INDEX_BUFFER_BIT, &m.ibuf, &m.imem);
+        m.index_count = @intCast(indices.len);
     }
 
     fn shaderModule(self: *Renderer, code: []align(4) const u8) !c.VkShaderModule {
@@ -405,6 +446,25 @@ pub const Renderer = struct {
         var want: u32 = caps.minImageCount + 1;
         if (caps.maxImageCount > 0) want = @min(want, caps.maxImageCount);
         want = @min(want, max_images);
+
+        var chosen_present_mode: c.VkPresentModeKHR = c.VK_PRESENT_MODE_FIFO_KHR;
+        if (self.uncapped) {
+            var mode_n: u32 = 0;
+            _ = c.vkGetPhysicalDeviceSurfacePresentModesKHR(self.phys, self.surface, &mode_n, null);
+            var modes: [16]c.VkPresentModeKHR = undefined;
+            mode_n = @min(mode_n, modes.len);
+            _ = c.vkGetPhysicalDeviceSurfacePresentModesKHR(self.phys, self.surface, &mode_n, &modes);
+            for (modes[0..mode_n]) |m| {
+                if (m == c.VK_PRESENT_MODE_MAILBOX_KHR) {
+                    chosen_present_mode = c.VK_PRESENT_MODE_MAILBOX_KHR;
+                    break;
+                } else if (m == c.VK_PRESENT_MODE_IMMEDIATE_KHR and chosen_present_mode != c.VK_PRESENT_MODE_MAILBOX_KHR) {
+                    chosen_present_mode = c.VK_PRESENT_MODE_IMMEDIATE_KHR;
+                }
+            }
+        }
+        self.actual_present_mode = chosen_present_mode;
+
         const sci = c.VkSwapchainCreateInfoKHR{
             .sType = c.VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
             .surface = self.surface,
@@ -413,11 +473,11 @@ pub const Renderer = struct {
             .imageColorSpace = chosen.colorSpace,
             .imageExtent = self.extent,
             .imageArrayLayers = 1,
-            .imageUsage = c.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+            .imageUsage = c.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | c.VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
             .imageSharingMode = c.VK_SHARING_MODE_EXCLUSIVE,
             .preTransform = caps.currentTransform,
             .compositeAlpha = c.VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
-            .presentMode = c.VK_PRESENT_MODE_FIFO_KHR,
+            .presentMode = chosen_present_mode,
             .clipped = c.VK_TRUE,
         };
         try vk(c.vkCreateSwapchainKHR(self.device, &sci, null, &self.swapchain));
@@ -470,13 +530,16 @@ pub const Renderer = struct {
     }
 
     /// Returns false if the swapchain must be recreated.
-    pub fn drawFrame(self: *Renderer, view_proj: math.Mat4, draws: []const DrawCmd) !bool {
+    pub fn drawFrame(self: *Renderer, view_proj: math.Mat4, draws: []const DrawCmd, ui_start_idx: usize, clear_color: [4]f32, sun_angle: f32) !bool {
+        const t0 = getMonotonicNs();
         try vk(c.vkWaitForFences(self.device, 1, &self.fence, c.VK_TRUE, std.math.maxInt(u64)));
+        const t1 = getMonotonicNs();
         var idx: u32 = 0;
         const acq = c.vkAcquireNextImageKHR(self.device, self.swapchain, std.math.maxInt(u64), self.acquire_sem, null, &idx);
         if (acq == c.VK_ERROR_OUT_OF_DATE_KHR) return false;
         if (acq != c.VK_SUCCESS and acq != c.VK_SUBOPTIMAL_KHR) return error.VulkanFailed;
         try vk(c.vkResetFences(self.device, 1, &self.fence));
+        const t2 = getMonotonicNs();
 
         try vk(c.vkResetCommandBuffer(self.cmd, 0));
         const bi = c.VkCommandBufferBeginInfo{
@@ -495,7 +558,7 @@ pub const Renderer = struct {
             .imageLayout = c.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
             .loadOp = c.VK_ATTACHMENT_LOAD_OP_CLEAR,
             .storeOp = c.VK_ATTACHMENT_STORE_OP_STORE,
-            .clearValue = .{ .color = .{ .float32 = sky_color } },
+            .clearValue = .{ .color = .{ .float32 = clear_color } },
         };
         const depth_att = c.VkRenderingAttachmentInfo{
             .sType = c.VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
@@ -521,14 +584,28 @@ pub const Renderer = struct {
         c.vkCmdSetScissor(self.cmd, 0, 1, &scissor);
 
         var bound: ?*const Mesh = null;
-        for (draws) |d| {
+        for (draws, 0..) |d, i| {
+            if (i == ui_start_idx) {
+                const clear_att = c.VkClearAttachment{
+                    .aspectMask = c.VK_IMAGE_ASPECT_DEPTH_BIT,
+                    .colorAttachment = 0,
+                    .clearValue = .{ .depthStencil = .{ .depth = 1.0, .stencil = 0 } },
+                };
+                const clear_rect = c.VkClearRect{
+                    .rect = .{ .offset = .{ .x = 0, .y = 0 }, .extent = self.extent },
+                    .baseArrayLayer = 0,
+                    .layerCount = 1,
+                };
+                c.vkCmdClearAttachments(self.cmd, 1, &clear_att, 1, &clear_rect);
+            }
             if (bound != d.mesh) {
                 const offset: c.VkDeviceSize = 0;
                 c.vkCmdBindVertexBuffers(self.cmd, 0, 1, &d.mesh.vbuf, &offset);
                 c.vkCmdBindIndexBuffer(self.cmd, d.mesh.ibuf, 0, c.VK_INDEX_TYPE_UINT32);
                 bound = d.mesh;
             }
-            const push = Push{ .view_proj = view_proj.m, .model = d.model.m };
+            var push = Push{ .view_proj = view_proj.m, .model = d.model.m };
+            push.model[15] = sun_angle;
             c.vkCmdPushConstants(self.cmd, self.layout, c.VK_SHADER_STAGE_VERTEX_BIT, 0, @sizeOf(Push), &push);
             c.vkCmdDrawIndexed(self.cmd, d.mesh.index_count, 1, 0, 0, 0);
         }
@@ -536,6 +613,7 @@ pub const Renderer = struct {
 
         self.barrier(self.images[idx], c.VK_IMAGE_ASPECT_COLOR_BIT, c.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, c.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, c.VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, c.VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT, c.VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT, 0);
         try vk(c.vkEndCommandBuffer(self.cmd));
+        const t3 = getMonotonicNs();
 
         const wait_stage: c.VkPipelineStageFlags = c.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
         const si = c.VkSubmitInfo{
@@ -549,6 +627,7 @@ pub const Renderer = struct {
             .pSignalSemaphores = &self.render_done[idx],
         };
         try vk(c.vkQueueSubmit(self.queue, 1, &si, self.fence));
+        const t4 = getMonotonicNs();
 
         const pi = c.VkPresentInfoKHR{
             .sType = c.VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
@@ -559,9 +638,105 @@ pub const Renderer = struct {
             .pImageIndices = &idx,
         };
         const pr = c.vkQueuePresentKHR(self.queue, &pi);
+        const t5 = getMonotonicNs();
+
+        last_frame_timing = .{
+            .gpu_wait_ms = @as(f32, @floatFromInt(t1 - t0)) * 1e-6,
+            .acquire_ms = @as(f32, @floatFromInt(t2 - t1)) * 1e-6,
+            .record_ms = @as(f32, @floatFromInt(t3 - t2)) * 1e-6,
+            .submit_ms = @as(f32, @floatFromInt(t4 - t3)) * 1e-6,
+            .present_ms = @as(f32, @floatFromInt(t5 - t4)) * 1e-6,
+        };
+
+        self.last_image_idx = idx;
         if (pr == c.VK_ERROR_OUT_OF_DATE_KHR or pr == c.VK_SUBOPTIMAL_KHR) return false;
         if (pr != c.VK_SUCCESS) return error.VulkanFailed;
         return true;
+    }
+
+    /// Captures the most recently presented swapchain image to a binary PPM (`P6`) file.
+    pub fn saveScreenshotPPM(self: *Renderer, path: [*:0]const u8) !void {
+        _ = c.vkDeviceWaitIdle(self.device);
+        const w = self.extent.width;
+        const h = self.extent.height;
+        const byte_len: usize = @as(usize, w) * @as(usize, h) * 4;
+
+        var buf: c.VkBuffer = null;
+        var mem: c.VkDeviceMemory = null;
+        const bci = c.VkBufferCreateInfo{
+            .sType = c.VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+            .size = byte_len,
+            .usage = c.VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            .sharingMode = c.VK_SHARING_MODE_EXCLUSIVE,
+        };
+        try vk(c.vkCreateBuffer(self.device, &bci, null, &buf));
+        defer c.vkDestroyBuffer(self.device, buf, null);
+
+        var req: c.VkMemoryRequirements = undefined;
+        c.vkGetBufferMemoryRequirements(self.device, buf, &req);
+        const mai = c.VkMemoryAllocateInfo{
+            .sType = c.VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+            .allocationSize = req.size,
+            .memoryTypeIndex = try self.findMemType(req.memoryTypeBits, c.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | c.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT),
+        };
+        try vk(c.vkAllocateMemory(self.device, &mai, null, &mem));
+        defer c.vkFreeMemory(self.device, mem, null);
+        try vk(c.vkBindBufferMemory(self.device, buf, mem, 0));
+
+        try vk(c.vkResetCommandBuffer(self.cmd, 0));
+        const bi = c.VkCommandBufferBeginInfo{
+            .sType = c.VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+            .flags = c.VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+        };
+        try vk(c.vkBeginCommandBuffer(self.cmd, &bi));
+        const img = self.images[self.last_image_idx];
+        self.barrier(img, c.VK_IMAGE_ASPECT_COLOR_BIT, c.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, c.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, c.VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, c.VK_PIPELINE_STAGE_2_TRANSFER_BIT, 0, c.VK_ACCESS_2_TRANSFER_READ_BIT);
+
+        const region = c.VkBufferImageCopy{
+            .bufferOffset = 0,
+            .bufferRowLength = 0,
+            .bufferImageHeight = 0,
+            .imageSubresource = .{ .aspectMask = c.VK_IMAGE_ASPECT_COLOR_BIT, .mipLevel = 0, .baseArrayLayer = 0, .layerCount = 1 },
+            .imageOffset = .{ .x = 0, .y = 0, .z = 0 },
+            .imageExtent = .{ .width = w, .height = h, .depth = 1 },
+        };
+        c.vkCmdCopyImageToBuffer(self.cmd, img, c.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, buf, 1, &region);
+        self.barrier(img, c.VK_IMAGE_ASPECT_COLOR_BIT, c.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, c.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, c.VK_PIPELINE_STAGE_2_TRANSFER_BIT, c.VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT, c.VK_ACCESS_2_TRANSFER_READ_BIT, 0);
+        try vk(c.vkEndCommandBuffer(self.cmd));
+
+        const si = c.VkSubmitInfo{
+            .sType = c.VK_STRUCTURE_TYPE_SUBMIT_INFO,
+            .commandBufferCount = 1,
+            .pCommandBuffers = &self.cmd,
+        };
+        try vk(c.vkQueueSubmit(self.queue, 1, &si, null));
+        _ = c.vkQueueWaitIdle(self.queue);
+
+        var ptr: ?*anyopaque = null;
+        try vk(c.vkMapMemory(self.device, mem, 0, byte_len, 0, &ptr));
+        defer c.vkUnmapMemory(self.device, mem);
+        const bgra: [*]const u8 = @ptrCast(ptr.?);
+
+        const fp = c.fopen(path, "wb") orelse return error.FileOpenFailed;
+        defer _ = c.fclose(fp);
+        var hdr_buf: [64]u8 = undefined;
+        const hdr = try std.fmt.bufPrint(&hdr_buf, "P6\n{d} {d}\n255\n", .{ w, h });
+        _ = c.fwrite(hdr.ptr, 1, hdr.len, fp);
+
+        var row_rgb: [4096 * 3]u8 = undefined;
+        const row_w = @min(@as(usize, w), 4096);
+        var y: usize = 0;
+        while (y < h) : (y += 1) {
+            var x: usize = 0;
+            while (x < row_w) : (x += 1) {
+                const p = (y * @as(usize, w) + x) * 4;
+                row_rgb[x * 3 + 0] = bgra[p + 2]; // R
+                row_rgb[x * 3 + 1] = bgra[p + 1]; // G
+                row_rgb[x * 3 + 2] = bgra[p + 0]; // B
+            }
+            _ = c.fwrite(&row_rgb, 1, row_w * 3, fp);
+        }
+        log.info("saved screenshot: {s} ({d}x{d})", .{ path, w, h });
     }
 
     pub fn deinit(self: *Renderer) void {

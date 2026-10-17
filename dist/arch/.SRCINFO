@@ -1,0 +1,21 @@
+pkgbase = airplane-game
+	pkgdesc = High-performance low-poly 3D dogfighting simulator built in Zig, Vulkan 1.3, Wayland, and ALSA
+	pkgver = 0.1.0
+	pkgrel = 1
+	url = https://github.com/0x07dc/AirplaneGame
+	arch = x86_64
+	arch = aarch64
+	license = MIT
+	makedepends = vulkan-headers
+	makedepends = wayland-protocols
+	makedepends = zig>=0.13.0
+	depends = alsa-lib
+	depends = vulkan-icd-loader
+	depends = wayland
+	optdepends = nvidia-utils: NVIDIA Vulkan driver
+	optdepends = vulkan-intel: Intel Vulkan driver
+	optdepends = vulkan-radeon: AMD Vulkan driver
+	source = airplane-game-0.1.0.tar.gz::https://github.com/0x07dc/AirplaneGame/archive/refs/tags/v0.1.0.tar.gz
+	sha256sums = SKIP
+
+pkgname = airplane-game

@@ -36,6 +36,9 @@ pub const Vec3 = struct {
     pub fn len(a: Vec3) f32 {
         return @sqrt(a.dot(a));
     }
+    pub fn lenSq(a: Vec3) f32 {
+        return a.dot(a);
+    }
     pub fn norm(a: Vec3) Vec3 {
         const l = a.len();
         return if (l > 1e-12) a.scale(1.0 / l) else a;
@@ -150,6 +153,9 @@ pub const Mat4 = struct {
     }
 };
 
+pub fn clamp(x: f32, min_val: f32, max_val: f32) f32 {
+    return std.math.clamp(x, min_val, max_val);
+}
 pub fn clamp01(x: f32) f32 {
     return std.math.clamp(x, 0, 1);
 }

@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a101d"/>
+      <stop offset="50%" stop-color="#0f192c"/>
+      <stop offset="100%" stop-color="#162540"/>
+    </linearGradient>
+
+    <!-- Radar Glow -->
+    <radialGradient id="radar-glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#00f0ff" stop-opacity="0.18"/>
+      <stop offset="70%" stop-color="#00f0ff" stop-opacity="0.04"/>
+      <stop offset="100%" stop-color="#00f0ff" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Afterburner Plume Gradient -->
+    <linearGradient id="thrust-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="25%" stop-color="#00f0ff"/>
+      <stop offset="60%" stop-color="#ff9900"/>
+      <stop offset="100%" stop-color="#ff3300" stop-opacity="0"/>
+    </linearGradient>
+
+    <!-- Fighter Jet Shading Gradients -->
+    <linearGradient id="wing-l-grad" x1="0%" y1="0%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#2a456c"/>
+      <stop offset="100%" stop-color="#1a2e4a"/>
+    </linearGradient>
+    <linearGradient id="wing-r-grad" x1="0%" y1="0%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#3b5e91"/>
+      <stop offset="100%" stop-color="#223959"/>
+    </linearGradient>
+    <linearGradient id="fuselage-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#4a73ad"/>
+      <stop offset="50%" stop-color="#709fd6"/>
+      <stop offset="100%" stop-color="#365785"/>
+    </linearGradient>
+    <linearGradient id="canopy-grad" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#e0ffff"/>
+      <stop offset="40%" stop-color="#00e5ff"/>
+      <stop offset="100%" stop-color="#005b8a"/>
+    </linearGradient>
+    <linearGradient id="gold-accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffe259"/>
+      <stop offset="100%" stop-color="#ffa751"/>
+    </linearGradient>
+    
+    <!-- Filter for Neon Glow -->
+    <filter id="neon-glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+  <!-- 1. Squircle Container -->
+  <rect x="16" y="16" width="480" height="480" rx="108" fill="url(#bg-grad)" stroke="#00f0ff" stroke-opacity="0.35" stroke-width="4"/>
+
+  <!-- 2. Cyber Tactical Grid & Reticle -->
+  <circle cx="256" cy="256" r="190" fill="url(#radar-glow)"/>
+  <circle cx="256" cy="256" r="180" fill="none" stroke="#00f0ff" stroke-width="1.5" stroke-opacity="0.25" stroke-dasharray="8 6"/>
+  <circle cx="256" cy="256" r="120" fill="none" stroke="#00f0ff" stroke-width="2" stroke-opacity="0.35"/>
+  <circle cx="256" cy="256" r="60" fill="none" stroke="#00f0ff" stroke-width="1.5" stroke-opacity="0.3"/>
+
+  <!-- HUD Compass Cardinal Ticks -->
+  <line x1="256" y1="64" x2="256" y2="84" stroke="#00f0ff" stroke-width="3" stroke-linecap="round"/>
+  <line x1="256" y1="428" x2="256" y2="448" stroke="#00f0ff" stroke-width="3" stroke-linecap="round"/>
+  <line x1="64" y1="256" x2="84" y2="256" stroke="#00f0ff" stroke-width="3" stroke-linecap="round"/>
+  <line x1="428" y1="256" x2="448" y2="256" stroke="#00f0ff" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- HUD Corner Brackets -->
+  <path d="M 60 100 L 60 60 L 100 60" fill="none" stroke="#00f0ff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 452 100 L 452 60 L 412 60" fill="none" stroke="#00f0ff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 60 412 L 60 452 L 100 452" fill="none" stroke="#00f0ff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 452 412 L 452 452 L 412 452" fill="none" stroke="#00f0ff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- 3. Supersonic Jet Afterburner Exhaust Flames -->
+  <!-- Left Engine Plume -->
+  <polygon points="238,368 248,368 243,452" fill="url(#thrust-grad)" filter="url(#neon-glow)"/>
+  <polygon points="240,368 246,368 243,410" fill="#ffffff"/>
+  <!-- Right Engine Plume -->
+  <polygon points="264,368 274,368 269,452" fill="url(#thrust-grad)" filter="url(#neon-glow)"/>
+  <polygon points="266,368 272,368 269,410" fill="#ffffff"/>
+
+  <!-- 4. Tactical Fighter Jet Airframe -->
+  <g transform="translate(0, -6)">
+    <!-- Main Delta Wings -->
+    <!-- Left Wing -->
+    <polygon points="256,190 238,348 76,326 230,250" fill="url(#wing-l-grad)" stroke="#17273d" stroke-width="2"/>
+    <!-- Right Wing -->
+    <polygon points="256,190 274,348 436,326 282,250" fill="url(#wing-r-grad)" stroke="#17273d" stroke-width="2"/>
+
+    <!-- Wing Leading-Edge Glowing Neon Strip -->
+    <line x1="256" y1="190" x2="76" y2="326" stroke="#00f0ff" stroke-width="3" stroke-linecap="round" filter="url(#neon-glow)"/>
+    <line x1="256" y1="190" x2="436" y2="326" stroke="#00f0ff" stroke-width="3" stroke-linecap="round" filter="url(#neon-glow)"/>
+
+    <!-- Wingtip Missile Rails -->
+    <rect x="70" y="318" width="8" height="24" rx="2" fill="#00e5ff"/>
+    <rect x="434" y="318" width="8" height="24" rx="2" fill="#00e5ff"/>
+
+    <!-- Horizontal Stabilizers / Elevons -->
+    <polygon points="236,346 220,388 178,394 228,360" fill="#1b2c44"/>
+    <polygon points="276,346 292,388 334,394 284,360" fill="#253c5c"/>
+
+    <!-- Twin Vertical Stabilizers (Rudders) -->
+    <polygon points="238,296 224,374 236,370 244,306" fill="#2c4b77" stroke="#00f0ff" stroke-width="1.5"/>
+    <polygon points="274,296 288,374 276,370 268,306" fill="#3a6096" stroke="#00f0ff" stroke-width="1.5"/>
+
+    <!-- Central Fuselage Spine -->
+    <polygon points="256,92 272,210 274,368 256,374 238,368 240,210" fill="url(#fuselage-grad)"/>
+
+    <!-- Nose Radome -->
+    <polygon points="256,86 264,152 256,160 248,152" fill="url(#gold-accent)"/>
+    <line x1="256" y1="86" x2="256" y2="70" stroke="#ffe259" stroke-width="3" stroke-linecap="round"/>
+
+    <!-- Tinted Stealth Canopy Glass -->
+    <polygon points="256,156 266,238 256,264 246,238" fill="url(#canopy-grad)" stroke="#ffffff" stroke-width="1.5" stroke-opacity="0.8"/>
+    <!-- Canopy Glint -->
+    <line x1="252" y1="172" x2="250" y2="228" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-opacity="0.85"/>
+  </g>
+
+  <!-- 5. Forward Lead Pursuit Crosshair / Diamond Pip -->
+  <g transform="translate(256, 120)" filter="url(#neon-glow)">
+    <polygon points="0,-14 14,0 0,14 -14,0" fill="none" stroke="#ffe259" stroke-width="2.5"/>
+    <circle cx="0" cy="0" r="2.5" fill="#ffe259"/>
+    <line x1="0" y1="-22" x2="0" y2="-16" stroke="#ffe259" stroke-width="2"/>
+    <line x1="0" y1="16" x2="0" y2="22" stroke="#ffe259" stroke-width="2"/>
+    <line x1="-22" y1="0" x2="-16" y2="0" stroke="#ffe259" stroke-width="2"/>
+    <line x1="16" y1="0" x2="22" y2="0" stroke="#ffe259" stroke-width="2"/>
+  </g>
+</svg>

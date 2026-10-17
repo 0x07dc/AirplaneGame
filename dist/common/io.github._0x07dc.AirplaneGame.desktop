@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=Airplane Combat Simulator
+GenericName=Tactical Flight Simulator
+Comment=High-performance 3D tactical flight simulator and dogfighting engine
+Icon=io.github._0x07dc.AirplaneGame
+Exec=airplane_game
+Terminal=false
+Categories=Game;Simulation;ActionGame;
+Keywords=airplane;flight;simulator;combat;dogfight;vulkan;wayland;
+StartupNotify=true
+PrefersNonDefaultGPU=true
+X-Purism-FormFactor=Workstation;
