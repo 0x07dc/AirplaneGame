@@ -470,10 +470,15 @@ pub const Plane = struct {
         };
     }
 
-    /// Triggered by pressing `1`: finds the nearest friendly (`Team.friendly`) aircraft carrier
-    /// on the planet and engages the automated carrier landing, health restoration, and takeoff sequence.
+    /// Triggered by pressing 'H' or '`': finds the nearest friendly (`Team.friendly`) aircraft carrier
+    /// on the planet and engages automated carrier landing, health restoration, and takeoff sequence.
+    /// If carrier recovery autopilot is already active, pressing it toggles autopilot OFF (restores manual flight).
     pub fn beginCarrierLanding(self: *Plane, carriers: []const planet.AircraftCarrier) ?usize {
-        if (self.carrier_mode != .free_flight) return self.target_carrier;
+        if (self.carrier_mode != .free_flight) {
+            self.carrier_mode = .free_flight;
+            self.rates = Vec3.zero;
+            return null;
+        }
         const my_dir = self.pos.norm();
         var best_idx: ?usize = null;
         var best_dot: f32 = -2.0;
@@ -509,33 +514,50 @@ pub const Plane = struct {
         switch (self.carrier_mode) {
             .free_flight => {},
             .approach => {
-                // Fly toward a final-approach glideslope point behind the carrier's stern, then flare onto the deck
-                const to_stern = stern_point.sub(self.pos);
-                const dist = to_stern.len();
-                // Entry gate 950 m behind the stern, 160 m above the deck
-                const entry_gate = stern_point.sub(car.fwd.scale(950.0)).add(car.dir.scale(160.0));
-                const waypoint = if (dist > 1100.0) entry_gate else stern_point;
-                const to_wp = waypoint.sub(self.pos);
-                const wp_dist = @max(to_wp.len(), 1.0);
-                const direct_dir = to_wp.scale(1.0 / wp_dist);
+                self.carrier_timer += dt;
+
+                const rel_stern = self.pos.sub(stern_point);
+                const dist = rel_stern.len();
+                const dist_fwd = rel_stern.dot(car.fwd);    // + forward along deck/bow, - behind stern in wake
+                const dist_right = rel_stern.dot(car.right); // lateral distance from runway centerline
+                const dist_up = rel_stern.dot(car.dir);     // vertical height above flight deck
+
+                // Entry gate positioned 1200m behind the stern, 180m above the deck along carrier approach heading
+                const entry_gate = stern_point.sub(car.fwd.scale(1200.0)).add(car.dir.scale(180.0));
 
                 // Spherical curvature & horizon guidance: when far away or occluded by the planet,
                 // steer tangentially along the spherical surface at cruise altitude rather than digging into terrain.
-                const rel = planet.evalTargetRel(self.pos, waypoint);
+                const rel = planet.evalTargetRel(self.pos, entry_gate);
                 const transit_blend: f32 = if (rel.is_occluded)
                     1.0
                 else
                     math.clamp01((dist - 1400.0) / 1600.0);
 
-                const cruise_alt = math.lerpf(160.0 + deck_height, 380.0, transit_blend);
+                const cruise_alt = math.lerpf(180.0 + deck_height, 380.0, transit_blend);
+
+                // Waypoint guidance: smoothly transition from spherical transit gate into runway glideslope
+                const waypoint = if (transit_blend > 0.05)
+                    entry_gate
+                else if (dist_fwd < -20.0) blk: {
+                    // Flying up the stern glideslope corridor: dynamically advance waypoint towards stern
+                    const lead_back = math.clamp(-dist_fwd * 0.50, 15.0, 600.0);
+                    const lead_alt = math.clamp(lead_back * 0.15 + deck_height, deck_height, 140.0);
+                    break :blk stern_point.sub(car.fwd.scale(lead_back)).add(car.dir.scale(lead_alt));
+                } else
+                    stern_point;
+
+                const to_wp = waypoint.sub(self.pos);
+                const wp_dist = @max(to_wp.len(), 1.0);
+                const direct_dir = to_wp.scale(1.0 / wp_dist);
+
                 const desired_dir = if (transit_blend > 0.01)
                     Vec3.lerp(direct_dir, rel.tangent_dir, transit_blend).norm()
                 else
                     direct_dir;
 
                 // Smoothly steer velocity & orientation toward waypoint (or carrier runway alignment when close)
-                const align_t = math.clamp01(1.0 - dist / 900.0);
-                const look_fwd = Vec3.lerp(desired_dir, car.fwd, align_t * 0.85).norm();
+                const align_t = math.clamp01(1.0 - dist / 800.0);
+                const look_fwd = Vec3.lerp(desired_dir, car.fwd, align_t * 0.90).norm();
                 const up_now = self.pos.norm();
                 const z_axis = look_fwd.scale(-1);
                 const x_axis = up_now.cross(z_axis).norm();
@@ -546,11 +568,20 @@ pub const Plane = struct {
                 self.dir = Vec3.lerp(self.dir, desired_dir, 1.0 - @exp(-9.0 * dt)).norm();
 
                 // Decelerate from supersonic transit down to approach speed as we near the stern
-                const target_spd = math.lerpf(420.0, 2400.0, math.clamp01((dist - 140.0) / 2800.0));
+                const target_spd = math.lerpf(380.0, 2400.0, math.clamp01((dist - 140.0) / 2800.0));
                 self.speed = math.lerpf(self.speed, target_spd, 1.0 - @exp(-4.0 * dt));
 
                 const step_dist = self.speed * dt;
-                if (dist <= step_dist + 28.0) {
+
+                // Robust touchdown capture conditions:
+                // 1. Within step distance of stern touchdown point
+                // 2. Over flight deck arrestor wire zone (-25m to +90m along deck, within 45m width, deck elevation)
+                // 3. Failsafe approach timer (12.0s max approach duration)
+                const at_stern = (dist <= step_dist + 35.0);
+                const over_deck = (dist_fwd >= -25.0 and dist_fwd <= 90.0 and @abs(dist_right) <= 45.0 and dist_up <= 35.0 and dist_up >= -20.0);
+                const approach_timeout = (self.carrier_timer >= 12.0);
+
+                if (at_stern or over_deck or approach_timeout) {
                     // Touchdown at the stern! Engage arresting gear
                     self.pos = stern_point;
                     self.rot = car.rot;
@@ -1450,5 +1481,15 @@ test "carrier auto-pilot recovery sequence: approach, 5-second recharge, and cat
     // Must return to free flight at cruise speed
     try std.testing.expectEqual(CarrierMode.free_flight, plane.carrier_mode);
     try std.testing.expect(plane.speed >= 1200.0);
+
+    // 4. Test toggling autopilot ON then OFF
+    const engaged = plane.beginCarrierLanding(&carriers);
+    try std.testing.expectEqual(@as(?usize, 0), engaged);
+    try std.testing.expectEqual(CarrierMode.approach, plane.carrier_mode);
+
+    // Pressing '`' again while active disengages autopilot back to free flight
+    const disengaged = plane.beginCarrierLanding(&carriers);
+    try std.testing.expectEqual(@as(?usize, null), disengaged);
+    try std.testing.expectEqual(CarrierMode.free_flight, plane.carrier_mode);
 }
 

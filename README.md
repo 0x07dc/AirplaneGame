@@ -249,6 +249,8 @@ Every combat sortie is standardized around three balanced theater sizes:
 | **Transmission Gear** | `1` through `9` | — | Stepped velocity presets from 20 m/s up to 3,800 m/s |
 | **Reverse Gear** | `0` | — | Ground carrier deck taxiing and emergency stopping |
 | **Target Lock Cycle** | `T` / `TAB` | — | Cycles combat radar lock across airborne hostiles |
+| **Carrier Autopilot** | **``` ` ```** (Backtick) | `H` | Toggles automated carrier landing, 5s repair & takeoff |
+| **Emergency Respawn** | **`R`** | — | Deploys at nearest carrier with 15s cooldown for glitch escape |
 | **Cycle Network Lag** | **`L`** | — | Cycles simulated latency (0ms, 35ms, 85ms, 175ms, 320ms) |
 | **Tactical Pause Menu** | **`ESC`** / `P` | — | Freezes flight in place; inspect airframe or access menus |
 
@@ -271,14 +273,22 @@ Fighting around a spherical planet introduces true line-of-sight (LOS) mechanics
 
 Patrolling supercarriers act as mobile forward operating bases:
 
-1. **Stern Approach**: Line up on the carrier's wake along its forward heading vector.
-2. **Glide Slope Speed**: Decelerate below **70 m/s** (`Gear 1` or speed brakes `SPACEBAR`).
-3. **Arrestor Trap**: Touch down on the flight deck. The arresting cable captures your tailhook, producing tire smoke and an audible cable trap snap.
-4. **Automated Triage & Rearm**:
+1. **Automated Carrier Autopilot Recovery (Key: ``` ` ``` or `H`)**:
+   - Press **``` ` ```** (backtick) or **`H`** at any time to engage automated carrier recovery to the nearest friendly (Blue Team) supercarrier.
+   - The autopilot navigates around the curvature of the planet at cruise altitude, decelerates along the glideslope centerline, touches down on the flight deck, rolls to an arrested stop, recharges hull health to **100% over 5 seconds**, and launches back off the bow via the EMALS catapult.
+   - **Toggle Disengage**: Press **``` ` ```** or **`H`** again at any point to immediately disengage autopilot and restore manual stick flight control.
+2. **Manual Stern Approach & Arrestor Trap**:
+   - Line up on the carrier's wake along its forward heading vector.
+   - Decelerate below **70 m/s** (`Gear 1` or speed brakes `SPACEBAR`).
+   - Touch down on the flight deck. The arresting cable captures your tailhook, producing tire smoke and an audible cable trap snap.
+3. **Automated Triage & Rearm**:
    - Velocity is safely arrested.
    - Hull integrity is restored to **100% HP** with visual nanite repair particles.
    - Vulcan cannon ammo, homing missiles, and bombs are reloaded to full capacity.
-5. **Catapult Launch**: Engage **`LEFT SHIFT`** (Afterburner Boost) to launch off the carrier bow.
+4. **Catapult Launch**: Engage **`LEFT SHIFT`** (Afterburner Boost) to launch off the carrier bow.
+5. **Emergency Respawn (Key: `R` // 15-Second Cooldown)**:
+   - If caught in a glitch, stuck in terrain, or trapped in an anomaly, press **`R`** to immediately execute an Emergency Respawn onto the nearest friendly aircraft carrier flight deck with full health and restored manual flight control.
+   - Emergency respawns have a **15-second cooldown timer** to prevent tactical combat exploitation while ensuring you never get stuck.
 
 ---
 

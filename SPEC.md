@@ -171,8 +171,8 @@ $$\vec{F}_{\text{total}} = \vec{F}_{\text{thrust}} + \vec{F}_{\text{lift}} + \ve
   - Automatically wings-level the aircraft ($\phi \to 0$).
   - Smoothly commands maximum positive pitch $+G$ climb until terrain clearance $> 150\text{ m}$ AGL.
 
-### 5.6 Aircraft Carrier Arrestor Trap Dynamics
-- **Trap Envelope**:
+### 5.6 Aircraft Carrier Arrestor Trap Dynamics & Automated Recovery
+- **Manual Trap Envelope**:
   - Horizontal capture window: $X \in [-18\text{ m}, +18\text{ m}]$ across flight deck centerline.
   - Vertical touchdown zone: $Y \in [0\text{ m}, 3.5\text{ m}]$ above deck surface.
   - Speed limit: $v \le 70\text{ m/s}$ ($252\text{ km/h}$).
@@ -180,8 +180,17 @@ $$\vec{F}_{\text{total}} = \vec{F}_{\text{thrust}} + \vec{F}_{\text{lift}} + \ve
 - **Arresting Deceleration**:
   - When hook engages cable, an elastic spring-damper deceleration profile is applied:
     $$a_{\text{cable}} = -k_{\text{cable}} (p - p_0) - c_{\text{cable}} v$$
-  - Velocity arrests to zero within $1.2$ seconds ($45\text{ m}$ rollout).
+  - Velocity arrests to zero within $1.45$ seconds ($45\text{ m}$ rollout).
   - Triggers tire smoke particles, ALSA cable snap acoustic event, and initiates instant hull triage (100% HP) and weapons reload.
+- **Carrier Autopilot Recovery Sequence (Keys: ``` ` ``` / `H`)**:
+  - **Spherical Approach Guidance**: Calculates great-circle tangent trajectory around planet curvature towards the glideslope entry corridor (1200m astern at 180m elevation), automatically decelerating from supersonic transit down to approach velocity.
+  - **Touchdown & Arrest**: Smoothly aligns with the longitudinal flight deck centerline and engages arresting cables upon deck capture (with a 12-second failsafe approach timer).
+  - **Health Recharge**: Restores hull integrity to **100% HP over a 5.0-second recharge duration** with visible repair nanite particles.
+  - **Catapult Launch**: Discharges steam/EMALS catapult off the carrier bow, accelerating to full cruise speed with a +16° climb-out before restoring free flight.
+  - **Autopilot Toggle**: Pressing **``` ` ```** or **`H`** while autopilot is active immediately cancels autopilot and returns full stick control to the pilot.
+- **Emergency Respawn (Key: `R` // 15-Second Cooldown)**:
+  - Instantaneous deployment at the nearest friendly aircraft carrier with restored health and manual flight controls.
+  - Governed by a **15-second cooldown timer** (`respawn_cooldown`), providing a reliable glitch/anomaly escape mechanism while preventing combat exploitation.
 
 ---
 

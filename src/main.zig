@@ -684,6 +684,8 @@ fn printHelp() void {
         \\  Tactical Hold / Pause:   ESC / P
         \\  Simulated Lag Preset:    L  (Cycles LAN -> 35ms -> 85ms -> 175ms -> 320ms)
         \\  Carrier Deck Landing:    Stern Glide Slope < 70 m/s to arrest and reup health
+        \\  Carrier Autopilot:       PRESS H or ` (Backtick) to toggle auto recovery & 5s recharge
+        \\  Emergency Respawn:       PRESS R (15s cooldown respawn timer for glitch recovery)
         \\
     ;
     std.debug.print("{s}", .{help_text});
@@ -773,6 +775,28 @@ fn setCarrierLandingAnnouncement(buf: *[48]u8, carrier_idx: usize) usize {
         @memcpy(buf[0..fallback.len], fallback);
         return fallback.len;
     }
+}
+
+fn setEmergencyRespawnAnnouncement(buf: *[48]u8) usize {
+    const msg = "EMERGENCY RESPAWN // 15S RECHARGE COOLDOWN";
+    @memcpy(buf[0..msg.len], msg);
+    return msg.len;
+}
+
+fn setRespawnCooldownAnnouncement(buf: *[48]u8, remaining: f32) usize {
+    if (std.fmt.bufPrint(buf, "RESPAWN COOLDOWN: {d:.1}S REMAINING", .{remaining})) |msg| {
+        return msg.len;
+    } else |_| {
+        const fallback = "RESPAWN ON COOLDOWN";
+        @memcpy(buf[0..fallback.len], fallback);
+        return fallback.len;
+    }
+}
+
+fn setAutopilotDisengagedAnnouncement(buf: *[48]u8) usize {
+    const msg = "AUTOPILOT DISENGAGED // MANUAL FLIGHT";
+    @memcpy(buf[0..msg.len], msg);
+    return msg.len;
 }
 
 const BenchmarkSample = struct {
@@ -1092,6 +1116,7 @@ pub fn main(init: std.process.Init.Minimal) !void {
     var announcement_buf: [48]u8 = undefined;
     var announcement_len: usize = 0;
     var announcement_dirty: bool = false;
+    var respawn_cooldown: f32 = 0.0;
 
     if (std.c.getenv("AG_SHOWCASE")) |sc| {
         if (sc[0] == '1') showcase = true;
@@ -1838,9 +1863,10 @@ pub fn main(init: std.process.Init.Minimal) !void {
         "HEAVY BOMBS       : RIGHT CTRL  OR  C (GROUND BASES & BLIMP)",
         "COCKPIT ZOOM      : Z (DECLUTTERS HUD WHILE ZOOMED)",
         "TRANSMISSION GEAR : 1 TO 9 (SPEEDS 20..3800 M/S), 0 (REVERSE)",
-        "CARRIER RECOVERY  : PRESS H  OR  ` (AUTOPILOT LANDING & RECHARGE)",
+        "CARRIER RECOVERY  : PRESS H  OR  ` (TOGGLE AUTOPILOT RECOVERY)",
+        "EMERGENCY RESPAWN : PRESS R (15S COOLDOWN // GLITCH ESCAPE)",
     };
-    var mesh_guide_rows: [10]*const gfx.Mesh = undefined;
+    var mesh_guide_rows: [11]*const gfx.Mesh = undefined;
     for (guide_entries, 0..) |entry_txt, gi| {
         var ge_b = try mesh.buildText(alloc, entry_txt, 0.016, 0.025, 0.003, Vec3.init(0.85, 0.92, 1.0));
         defer ge_b.deinit();
@@ -3117,10 +3143,17 @@ pub fn main(init: std.process.Init.Minimal) !void {
         }
 
         // Press 'H' or '`' (backtick/grave) to auto-land on the nearest friendly (Blue Team) Aircraft Carrier, restore health, and catapult launch!
+        // Pressing it again disengages autopilot and returns full manual control to the pilot.
         if (screen_state == .in_game and (win.grave_pressed or win.h_pressed)) {
             win.grave_pressed = false;
             win.h_pressed = false;
-            if (plane.beginCarrierLanding(world_objects.carriers[0..world_objects.carrier_count])) |cidx| {
+            if (plane.carrier_mode != .free_flight) {
+                _ = plane.beginCarrierLanding(world_objects.carriers[0..world_objects.carrier_count]);
+                announcement_timer = 4.0;
+                announcement_len = setAutopilotDisengagedAnnouncement(&announcement_buf);
+                announcement_dirty = true;
+                log.info("AUTOPILOT: Disengaged by pilot. Manual flight control restored.", .{});
+            } else if (plane.beginCarrierLanding(world_objects.carriers[0..world_objects.carrier_count])) |cidx| {
                 announcement_timer = 5.0;
                 announcement_len = setCarrierLandingAnnouncement(&announcement_buf, cidx);
                 announcement_dirty = true;
@@ -3132,12 +3165,25 @@ pub fn main(init: std.process.Init.Minimal) !void {
             }
         }
 
-        // Press 'R' to manual respawn immediately at nearest friendly Aircraft Carrier!
+        // Press 'R' for emergency respawn at nearest friendly Aircraft Carrier (15-second cooldown timer for glitch recovery)
         if (screen_state == .in_game and win.respawn_pressed) {
             win.respawn_pressed = false;
-            plane.respawnNearestCarrier(world_objects.carriers[0..world_objects.carrier_count]);
-            cam.pos = plane.pos.sub(plane.dir.scale(16.0)).add(plane.pos.norm().scale(4.5));
-            log.info("RESPAWN: Pilot deployed from friendly Aircraft Carrier with full health!", .{});
+            if (respawn_cooldown <= 0.0) {
+                plane.carrier_mode = .free_flight;
+                plane.respawnNearestCarrier(world_objects.carriers[0..world_objects.carrier_count]);
+                cam.pos = plane.pos.sub(plane.dir.scale(16.0)).add(plane.pos.norm().scale(4.5));
+                respawn_cooldown = 15.0;
+                announcement_timer = 4.5;
+                announcement_len = setEmergencyRespawnAnnouncement(&announcement_buf);
+                announcement_dirty = true;
+                audio.global_audio.triggerTargetLockTone();
+                log.info("RESPAWN: Pilot emergency respawn deployed from friendly Aircraft Carrier (15s cooldown active)!", .{});
+            } else {
+                announcement_timer = 2.5;
+                announcement_len = setRespawnCooldownAnnouncement(&announcement_buf, respawn_cooldown);
+                announcement_dirty = true;
+                log.info("RESPAWN: Emergency respawn on cooldown ({d:.1}s remaining).", .{respawn_cooldown});
+            }
         }
 
         // Press 'T' to toggle Auto-Targeting & Gyro Guiding
@@ -3370,6 +3416,10 @@ pub fn main(init: std.process.Init.Minimal) !void {
                 weaponsSpawnLaser,
                 weaponsSpawnMissile,
             );
+
+            if (respawn_cooldown > 0.0) {
+                respawn_cooldown = @max(0.0, respawn_cooldown - sim_dt);
+            }
 
             // Replicate weapons fired by remote multiplayer players
             for (&net_mgr.interpolated_players) |*rip| {
@@ -6610,9 +6660,9 @@ pub fn main(init: std.process.Init.Minimal) !void {
                     n += 1;
                 }
 
-                // 10 Flight Control rows
-                const row_start_y: f32 = 0.260;
-                const row_spacing: f32 = 0.050;
+                // 11 Flight Control rows
+                const row_start_y: f32 = 0.280;
+                const row_spacing: f32 = 0.046;
                 for (mesh_guide_rows, 0..) |row_mesh, gi| {
                     const y_pos = row_start_y - (@as(f32, @floatFromInt(gi)) * row_spacing);
                     if (n < max_draws) {
