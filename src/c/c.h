@@ -3,6 +3,7 @@
 #include <wayland-client.h>
 #include "xdg-shell-client-protocol.h"
 #include "xdg-decoration-client-protocol.h"
+#include "xdg-toplevel-icon-v1-client-protocol.h"
 #include <poll.h>
 #include <time.h>
 #include <unistd.h>

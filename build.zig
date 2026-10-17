@@ -19,9 +19,10 @@ pub fn build(b: *std.Build) void {
         .link_libc = true,
     });
     mod.addImport("c", tc.createModule());
-    // wayland-scanner generated xdg-shell + xdg-decoration glue
+    // wayland-scanner generated xdg-shell + xdg-decoration + xdg-toplevel-icon glue
     mod.addCSourceFile(.{ .file = b.path("src/c/xdg-shell-protocol.c"), .flags = &.{} });
     mod.addCSourceFile(.{ .file = b.path("src/c/xdg-decoration-protocol.c"), .flags = &.{} });
+    mod.addCSourceFile(.{ .file = b.path("src/c/xdg-toplevel-icon-v1-protocol.c"), .flags = &.{} });
     mod.addIncludePath(b.path("src/c"));
     mod.linkSystemLibrary("wayland-client", .{});
     mod.linkSystemLibrary("vulkan", .{});

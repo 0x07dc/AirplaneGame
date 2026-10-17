@@ -9,6 +9,7 @@ pub const Window = struct {
     wm_base: ?*c.struct_xdg_wm_base = null,
     decoration_manager: ?*c.struct_zxdg_decoration_manager_v1 = null,
     decoration: ?*c.struct_zxdg_toplevel_decoration_v1 = null,
+    icon_manager: ?*c.struct_xdg_toplevel_icon_manager_v1 = null,
     surface: *c.struct_wl_surface_2 = undefined,
     xdg_surface: *c.struct_xdg_surface = undefined,
     toplevel: *c.struct_xdg_toplevel = undefined,
@@ -104,8 +105,15 @@ pub const Window = struct {
         _ = c.xdg_surface_add_listener(self.xdg_surface, &xdg_surface_listener, self);
         self.toplevel = c.xdg_surface_get_toplevel(self.xdg_surface) orelse return error.NoSurface;
         _ = c.xdg_toplevel_add_listener(self.toplevel, &toplevel_listener, self);
-        c.xdg_toplevel_set_title(self.toplevel, "Airplane Game");
-        c.xdg_toplevel_set_app_id(self.toplevel, "airplane_game");
+        c.xdg_toplevel_set_title(self.toplevel, "Airplane Combat Simulator");
+        c.xdg_toplevel_set_app_id(self.toplevel, "io.github._0x07dc.AirplaneGame");
+        if (self.icon_manager) |im| {
+            if (c.xdg_toplevel_icon_manager_v1_create_icon(im)) |icon| {
+                c.xdg_toplevel_icon_v1_set_name(icon, "io.github._0x07dc.AirplaneGame");
+                c.xdg_toplevel_icon_manager_v1_set_icon(im, self.toplevel, icon);
+                c.xdg_toplevel_icon_v1_destroy(icon);
+            }
+        }
         if (self.decoration_manager) |dm| {
             if (c.zxdg_decoration_manager_v1_get_toplevel_decoration(dm, self.toplevel)) |dec| {
                 self.decoration = dec;
@@ -121,6 +129,7 @@ pub const Window = struct {
     }
 
     pub fn deinit(self: *Window) void {
+        if (self.icon_manager) |im| c.xdg_toplevel_icon_manager_v1_destroy(im);
         if (self.decoration) |dec| c.zxdg_toplevel_decoration_v1_destroy(dec);
         if (self.decoration_manager) |dm| c.zxdg_decoration_manager_v1_destroy(dm);
         if (self.keyboard) |kb| c.wl_keyboard_release(kb);
@@ -159,6 +168,8 @@ pub const Window = struct {
             self.wm_base = @ptrCast(c.wl_registry_bind(reg, name, &c.xdg_wm_base_interface, 1));
         } else if (std.mem.eql(u8, i, "zxdg_decoration_manager_v1")) {
             self.decoration_manager = @ptrCast(c.wl_registry_bind(reg, name, &c.zxdg_decoration_manager_v1_interface, 1));
+        } else if (std.mem.eql(u8, i, "xdg_toplevel_icon_manager_v1")) {
+            self.icon_manager = @ptrCast(c.wl_registry_bind(reg, name, &c.xdg_toplevel_icon_manager_v1_interface, 1));
         } else if (std.mem.eql(u8, i, "wl_seat") and self.seat == null) {
             const seat: *c.struct_wl_seat = @ptrCast(c.wl_registry_bind(reg, name, &c.wl_seat_interface, @min(version, 5)));
             self.seat = seat;
