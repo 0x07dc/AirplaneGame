@@ -76,6 +76,8 @@ pub const AudioEngine = struct {
     shot_seed: u32 = 123456789,
     noise_lpf: f32 = 0.0,
     wind_lpf: f32 = 0.0,
+    rec_wav_file: ?*c.FILE = null,
+    rec_wav_samples: u32 = 0,
 
     pub fn setMusicState(self: *AudioEngine, active: bool, vol: f32) void {
         self.mutex.lock();
@@ -638,6 +640,11 @@ pub const AudioEngine = struct {
                 pcm_buffer[frame_i * 2 + 1] = sample_i16_r;
             }
 
+            if (self.rec_wav_file) |wf| {
+                _ = c.fwrite(&pcm_buffer, 2, buffer_frames * 2, wf);
+                self.rec_wav_samples += @intCast(buffer_frames);
+            }
+
             // Write PCM buffer to audio hardware
             if (self.pcm_handle) |pcm| {
                 const written = c.snd_pcm_writei(pcm, &pcm_buffer, buffer_frames);
@@ -647,6 +654,44 @@ pub const AudioEngine = struct {
                 }
             }
         }
+    }
+
+    pub fn startWavRecording(self: *AudioEngine, path: [*:0]const u8) !void {
+        self.mutex.lock();
+        defer self.mutex.unlock();
+        self.rec_wav_file = c.fopen(path, "wb");
+        if (self.rec_wav_file == null) return error.FileOpenFailed;
+        var dummy_hdr: [44]u8 = [_]u8{0} ** 44;
+        _ = c.fwrite(&dummy_hdr, 1, 44, self.rec_wav_file);
+        self.rec_wav_samples = 0;
+        std.log.info("audio: started WAV recording to {s}", .{path});
+    }
+
+    pub fn stopWavRecording(self: *AudioEngine) void {
+        self.mutex.lock();
+        defer self.mutex.unlock();
+        const fp = self.rec_wav_file orelse return;
+        self.rec_wav_file = null;
+        _ = c.fseek(fp, 0, c.SEEK_SET);
+        const data_bytes = self.rec_wav_samples * 4;
+        const total_file_size = data_bytes + 36;
+        var hdr: [44]u8 = undefined;
+        @memcpy(hdr[0..4], "RIFF");
+        std.mem.writeInt(u32, hdr[4..8], total_file_size, .little);
+        @memcpy(hdr[8..12], "WAVE");
+        @memcpy(hdr[12..16], "fmt ");
+        std.mem.writeInt(u32, hdr[16..20], 16, .little);
+        std.mem.writeInt(u16, hdr[20..22], 1, .little);
+        std.mem.writeInt(u16, hdr[22..24], 2, .little);
+        std.mem.writeInt(u32, hdr[24..28], 44100, .little);
+        std.mem.writeInt(u32, hdr[28..32], 44100 * 4, .little);
+        std.mem.writeInt(u16, hdr[32..34], 4, .little);
+        std.mem.writeInt(u16, hdr[34..36], 16, .little);
+        @memcpy(hdr[36..40], "data");
+        std.mem.writeInt(u32, hdr[40..44], data_bytes, .little);
+        _ = c.fwrite(&hdr, 1, 44, fp);
+        _ = c.fclose(fp);
+        std.log.info("audio: WAV recording saved ({d} samples).", .{self.rec_wav_samples});
     }
 };
 

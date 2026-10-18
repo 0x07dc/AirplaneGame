@@ -512,6 +512,127 @@
       }
     }
 
+    /* Video Showcase */
+    .video-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.75rem;
+    }
+
+    @media (max-width: 1024px) {
+      .video-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    @media (max-width: 768px) {
+      .video-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .video-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-hud);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+    }
+
+    .video-card:hover {
+      transform: translateY(-4px);
+      border-color: var(--cyan-neon);
+      box-shadow: 0 10px 30px rgba(0, 240, 255, 0.15);
+    }
+
+    .video-card-highlight {
+      border-color: rgba(255, 170, 0, 0.4);
+    }
+
+    .video-card-highlight:hover {
+      border-color: #ffaa00;
+      box-shadow: 0 10px 30px rgba(255, 170, 0, 0.2);
+    }
+
+    .video-wrap {
+      position: relative;
+      aspect-ratio: 16 / 9;
+      background: #03060a;
+      overflow: hidden;
+    }
+
+    .video-wrap video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .video-badge {
+      position: absolute;
+      bottom: 0.75rem;
+      right: 0.75rem;
+      background: rgba(5, 10, 18, 0.85);
+      border: 1px solid var(--cyan-neon);
+      color: var(--cyan-neon);
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      pointer-events: none;
+    }
+
+    .badge-highlight {
+      border-color: #ffaa00;
+      color: #ffaa00;
+    }
+
+    .video-info {
+      padding: 1.25rem 1.4rem;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .video-tag {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--cyan-neon);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 0.4rem;
+      font-weight: 700;
+    }
+
+    .tag-highlight {
+      color: #ffaa00;
+    }
+
+    .video-info h3 {
+      color: var(--text-bright);
+      font-size: 1.05rem;
+      margin-bottom: 0.5rem;
+      line-height: 1.35;
+    }
+
+    .video-info p {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      line-height: 1.5;
+    }
+
+    .video-info code {
+      background: rgba(0, 240, 255, 0.1);
+      color: var(--cyan-neon);
+      padding: 0.1rem 0.35rem;
+      border-radius: 3px;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+    }
+
     .gallery-item {
       background: var(--bg-card);
       border: 1px solid var(--border-hud);
@@ -1024,6 +1145,7 @@
 
       <ul class="nav-links">
         <li><a href="#features">Features</a></li>
+        <li><a href="#videos">Videos</a></li>
         <li><a href="#gallery">Cockpit HUD</a></li>
         <li><a href="#benchmarks">Benchmarks</a></li>
         <li><a href="#install">Install</a></li>
@@ -1174,6 +1296,65 @@
           <div class="feature-icon">🎯</div>
           <h3>Smart Avionics Arsenal</h3>
           <p>LCOS lead-computing gunsight, AIM-9 Sidewinder infrared/radar homing missiles, CCIP demolition bombs, and clutter-free smart edge radar guidance.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================================================================
+       GAMEPLAY VIDEOS SECTION
+       =================================================================== -->
+  <section id="videos" class="section">
+    <div class="container">
+      <div class="section-title-wrap">
+        <p class="section-tag">LIVE ENGINE CAPTURE // 30 FPS 720P HD STEREO</p>
+        <h2 class="section-title">Gameplay Demonstrations</h2>
+      </div>
+
+      <div class="video-grid">
+        <div class="video-card">
+          <div class="video-wrap">
+            <video controls preload="metadata" poster="./screenshots/shot_carrier_takeoff.png">
+              <source src="./videos/carrier_sortie_mission.mp4" type="video/mp4">
+              Your browser does not support HTML5 video.
+            </video>
+            <span class="video-badge">1:15</span>
+          </div>
+          <div class="video-info">
+            <div class="video-tag">MISSION SORTIE</div>
+            <h3>Carrier Launch, Metropolis Run & Emergency Recovery</h3>
+            <p>Supercarrier catapult launch with afterburners, supersonic flight into downtown skyscraper corridors, Vulcan cannon & Sidewinder missile kill, 500lb demolition bombing, and emergency carrier deck recovery (15s countdown on deck with <code>Y</code> key) followed by catapult relaunch.</p>
+          </div>
+        </div>
+
+        <div class="video-card">
+          <div class="video-wrap">
+            <video controls preload="metadata" poster="./screenshots/shot_dogfight_indicators.png">
+              <source src="./videos/planetary_strike_theater.mp4" type="video/mp4">
+              Your browser does not support HTML5 video.
+            </video>
+            <span class="video-badge">1:10</span>
+          </div>
+          <div class="video-info">
+            <div class="video-tag">FLEET THEATER</div>
+            <h3>32-Player Air Battle, Cockpit Optical Zoom & Zeppelin Boss</h3>
+            <p>Full 16v16 theater squadron dogfight across the planet, Cockpit Optical Zoom mode (<code>Z</code>) with telescopic sniper HUD, naval fleet strike bombing runs on ocean battleships, and dreadnought boss battle against the Evil Zeppelin.</p>
+          </div>
+        </div>
+
+        <div class="video-card video-card-highlight">
+          <div class="video-wrap">
+            <video controls preload="metadata" poster="./screenshots/shot_city_street.png">
+              <source src="./videos/hypersonic_action_highlight.mp4" type="video/mp4">
+              Your browser does not support HTML5 video.
+            </video>
+            <span class="video-badge badge-highlight">BEST CLIP // 0:25</span>
+          </div>
+          <div class="video-info">
+            <div class="video-tag tag-highlight">TOP GUN HIGHLIGHT</div>
+            <h3>Hypersonic Action Highlight Reel</h3>
+            <p>High-octane action sequence: Catapult launch into sunset, Mach 5 low-altitude skyscraper canyon slice, Sidewinder missile target lock & mid-air explosion kill (+4 POINTS), and vertical 90-degree climb into the twilight stratosphere.</p>
+          </div>
         </div>
       </div>
     </div>

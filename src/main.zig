@@ -669,6 +669,7 @@ fn printHelp() void {
         \\  --loss <pct>             Simulate network packet loss percentage (0..100)
         \\  --showcase               Run automated visual showcase benchmark & verification
         \\  --benchmark              Run automated 6-tier gameplay performance & stutter benchmark
+        \\  --record-demo <1|2|3>    Record automated 30fps gameplay demonstration video with audio (1=Carrier Sortie, 2=Fleet Strike, 3=Highlight)
         \\  --uncapped               Enable uncapped mailbox/immediate presentation mode
         \\
         \\CONTROLS:
@@ -1092,6 +1093,8 @@ fn printBenchmarkReport(r: *const gfx.Renderer, results: []const TierResult) voi
 pub fn main(init: std.process.Init.Minimal) !void {
     var showcase = false;
     var benchmark = false;
+    var record_demo: u32 = 0;
+    var rec_total_frames: u64 = 0;
     var uncapped = false;
     var no_audio = false;
     var start_screen: GameScreen = .title_screen;
@@ -1122,6 +1125,11 @@ pub fn main(init: std.process.Init.Minimal) !void {
 
     if (std.c.getenv("AG_SHOWCASE")) |sc| {
         if (sc[0] == '1') showcase = true;
+    }
+    if (std.c.getenv("AG_RECORD_DEMO")) |rd| {
+        record_demo = std.fmt.parseInt(u32, std.mem.span(rd), 10) catch 1;
+        start_screen = .in_game;
+        screenname_chosen = true;
     }
     if (std.c.getenv("AG_BENCHMARK")) |bm| {
         if (bm[0] == '1') {
@@ -1223,7 +1231,31 @@ pub fn main(init: std.process.Init.Minimal) !void {
             if (arg_i < args.len) {
                 cli_master = std.mem.span(args[arg_i]);
             }
+        } else if (std.mem.eql(u8, arg, "--record-demo")) {
+            arg_i += 1;
+            if (arg_i < args.len) {
+                const demo_str = std.mem.span(args[arg_i]);
+                record_demo = std.fmt.parseInt(u32, demo_str, 10) catch 1;
+            } else {
+                record_demo = 1;
+            }
+            start_screen = .in_game;
+            screenname_chosen = true;
         }
+    }
+
+    if (record_demo == 1) {
+        rec_total_frames = 2250;
+        selected_fleet_idx = 1; // 16 fighters
+        cli_spawn_carrier = true;
+    } else if (record_demo == 2) {
+        rec_total_frames = 2100;
+        selected_fleet_idx = 2; // 32 combatants
+        cli_spawn_carrier = false;
+    } else if (record_demo == 3) {
+        rec_total_frames = 750;
+        selected_fleet_idx = 1; // 16 fighters
+        cli_spawn_carrier = true;
     }
 
     var win = Window{};
@@ -2135,6 +2167,22 @@ pub fn main(init: std.process.Init.Minimal) !void {
     }
     var menu_look_target: Vec3 = Vec3.zero;
 
+    if (record_demo > 0) {
+        const raw_v: [*:0]const u8 = switch (record_demo) {
+            1 => "/tmp/airplane_demo1_raw.mp4",
+            2 => "/tmp/airplane_demo2_raw.mp4",
+            else => "/tmp/airplane_demo3_raw.mp4",
+        };
+        const raw_a: [*:0]const u8 = switch (record_demo) {
+            1 => "/tmp/airplane_demo1_audio.wav",
+            2 => "/tmp/airplane_demo2_audio.wav",
+            else => "/tmp/airplane_demo3_audio.wav",
+        };
+        try r.startRecording(raw_v, 30);
+        try audio.global_audio.startWavRecording(raw_a);
+        log.info("[DEMO {d}] Recording pipeline engaged (target: {d} frames / {d:.1}s)", .{ record_demo, rec_total_frames, @as(f32, @floatFromInt(rec_total_frames)) / 30.0 });
+    }
+
     var bench_tier: usize = 0;
     var bench_frame_in_tier: usize = 0;
     const bench_warmup: usize = 15;
@@ -2540,8 +2588,8 @@ pub fn main(init: std.process.Init.Minimal) !void {
         }
 
         const now = nowSeconds();
-        const frame_dt: f32 = @floatCast(@min(now - last, 0.1));
-        acc = @min(acc + (now - last), 0.25);
+        const frame_dt: f32 = if (record_demo > 0) 1.0 / 30.0 else @floatCast(@min(now - last, 0.1));
+        acc = if (record_demo > 0) sim_dt * 4.0 else @min(acc + (now - last), 0.25);
         last = now;
         sim_time += frame_dt;
 
@@ -3248,6 +3296,201 @@ pub fn main(init: std.process.Init.Minimal) !void {
         if (showcase and frame >= 24 and frame <= 29) {
             input.boost = true;
         }
+        var demo_fire_l = false;
+        var demo_fire_r = false;
+        var demo_fire_bomb = false;
+
+        if (record_demo == 1) {
+            // Demo 1: Carrier Sortie, Metropolis Run, Dogfight, Bombing, and Emergency Recovery
+            if (frame < 30) {
+                input.pitch = 0.0;
+                input.roll = 0.0;
+                input.boost = false;
+                plane.speed = 0.0;
+            } else if (frame < 180) {
+                input.boost = true;
+                input.pitch = 0.06;
+                plane.speed = @min(450.0, plane.speed + 350.0 * frame_dt);
+                plane.setGear(9);
+            } else if (frame < 480) {
+                input.boost = true;
+                input.pitch = 0.12;
+                input.roll = -0.32;
+            } else if (frame == 480 and world_objects.city_count > 0) {
+                const c0 = world_objects.cities[0];
+                const d_city = planet.cityPointDir(c0, 0.0, -1100.0);
+                plane.spawnAt(d_city, c0.north);
+                plane.pos = d_city.scale(planet.surfaceRadius(d_city) + 195.0);
+                plane.prev_pos = plane.pos;
+                plane.setGear(3);
+                plane.speed = 280.0;
+                cam.pos = plane.pos.sub(plane.dir.scale(14.0)).add(d_city.scale(4.5));
+                cam.up = d_city;
+            } else if (frame >= 480 and frame < 720) {
+                input.pitch = 0.0;
+                input.roll = 0.22;
+                input.boost = false;
+            } else if (frame == 720 and world_objects.city_count > 0) {
+                const c0 = world_objects.cities[0];
+                const d_st = planet.cityPointDir(c0, 0.0, -320.0);
+                plane.spawnAt(d_st, c0.north);
+                plane.pos = d_st.scale(planet.surfaceRadius(d_st) + 18.0);
+                plane.prev_pos = plane.pos;
+                plane.setGear(1);
+                plane.speed = 130.0;
+                cam.pos = plane.pos.sub(plane.dir.scale(13.0)).add(d_st.scale(3.8));
+                cam.up = d_st;
+            } else if (frame >= 720 and frame < 1080) {
+                input.pitch = 0.02;
+                input.roll = -0.06;
+            } else if (frame == 1080) {
+                if (battle.fighter_count > 0) {
+                    for (battle.fighters[0..battle.fighter_count], 0..) |*tgt, ti| {
+                        if (tgt.isAlive() and tgt.team == .enemy) {
+                            plane.pos = tgt.pos.sub(tgt.dir.scale(220.0)).add(tgt.rot.rotate(Vec3.up).scale(18.0));
+                            plane.prev_pos = plane.pos;
+                            plane.rot = tgt.rot;
+                            plane.dir = tgt.dir;
+                            plane.speed = tgt.speed + 25.0;
+                            plane.locked_target = ti;
+                            plane.targeting_mode = true;
+                            plane.bfm_phase = .firing_solution;
+                            plane.firing_solution = true;
+                            cam.pos = plane.pos.sub(plane.dir.scale(14.0)).add(plane.pos.norm().scale(4.2));
+                            break;
+                        }
+                    }
+                }
+            } else if (frame >= 1080 and frame < 1380) {
+                if (frame % 8 < 3) demo_fire_l = true;
+                if (frame == 1140 or frame == 1210) demo_fire_r = true;
+                input.pitch = 0.06;
+                input.roll = 0.12;
+            } else if (frame == 1380 and world_objects.base_count > 0) {
+                const mbase = world_objects.bases[0];
+                const b_pos = mbase.pos.add(mbase.dir.scale(140.0)).sub(mbase.north.scale(320.0));
+                plane.pos = b_pos;
+                plane.prev_pos = b_pos;
+                plane.rot = mbase.rot;
+                plane.dir = mbase.north;
+                plane.speed = 230.0;
+                cam.pos = plane.pos.sub(plane.dir.scale(14.0)).add(mbase.dir.scale(4.5));
+            } else if (frame >= 1380 and frame < 1680) {
+                input.pitch = -0.07;
+                if (frame == 1430 or frame == 1490 or frame == 1550) demo_fire_bomb = true;
+            } else if (frame == 1680 and world_objects.carrier_count > 0) {
+                plane.emergencyRecoverCarrier(world_objects.carriers[0..world_objects.carrier_count]);
+                respawn_cooldown = 15.0;
+                plane.health = 35.0;
+                last_recovery_sec = 999;
+                announcement_timer = 1.0;
+                audio.global_audio.triggerTargetLockTone();
+                log.info("[DEMO 1] TRIGGERED 15-SECOND EMERGENCY RECOVERY ON CARRIER", .{});
+            } else if (frame >= 1680 and frame < 2130) {
+                // Healing on carrier flight deck, countdown ticking down from 15s to 0s
+            } else if (frame >= 2130) {
+                input.boost = true;
+                input.pitch = 0.14;
+            }
+        } else if (record_demo == 2) {
+            // Demo 2: 32-player squadron combat, optical zoom, naval bombing, and Evil Zeppelin boss
+            if (frame == 0) {
+                plane.speed = 340.0;
+                plane.setGear(7);
+                plane.targeting_mode = true;
+            }
+            if (frame < 540) {
+                if (frame % 9 < 3) demo_fire_l = true;
+                if (frame % 80 == 25) demo_fire_r = true;
+                input.roll = 0.24;
+                input.pitch = 0.11;
+            } else if (frame >= 540 and frame < 1080) {
+                input.roll = -0.16;
+                input.pitch = 0.07;
+                if (frame % 6 < 2) demo_fire_l = true;
+                if (frame % 70 == 15) demo_fire_r = true;
+            } else if (frame == 1080 and world_objects.ship_count > 0) {
+                const sh = world_objects.ships[0];
+                const tr = planet.evalShipAgent(sh, sim_time);
+                const s_fwd = tr.rot.rotate(Vec3.forward);
+                plane.pos = tr.pos.add(tr.dir.scale(150.0)).sub(s_fwd.scale(320.0));
+                plane.prev_pos = plane.pos;
+                plane.rot = tr.rot;
+                plane.dir = s_fwd;
+                plane.speed = 240.0;
+                cam.pos = plane.pos.sub(plane.dir.scale(14.0)).add(tr.dir.scale(4.2));
+            } else if (frame >= 1080 and frame < 1500) {
+                input.pitch = -0.05;
+                if (frame == 1140 or frame == 1210 or frame == 1280) demo_fire_bomb = true;
+                if (frame % 8 < 3) demo_fire_l = true;
+            } else if (frame == 1500 and world_objects.blimp_count > 0) {
+                const bl = world_objects.blimps[0];
+                const tr = planet.evalBlimpAgent(bl, sim_time);
+                plane.pos = tr.pos.add(tr.dir.scale(35.0)).sub(tr.fwd.scale(240.0));
+                plane.prev_pos = plane.pos;
+                plane.rot = tr.rot;
+                plane.dir = tr.fwd;
+                plane.speed = 250.0;
+                cam.pos = plane.pos.sub(plane.dir.scale(14.0)).add(tr.dir.scale(4.5));
+            } else if (frame >= 1500 and frame < 2100) {
+                if (frame % 4 < 2) demo_fire_l = true;
+                if (frame % 40 == 10) demo_fire_r = true;
+                input.pitch = 0.05;
+                input.roll = 0.20;
+            }
+        } else if (record_demo == 3) {
+            // Demo 3: Hypersonic Top Gun highlight reel (25s)
+            if (frame < 150) {
+                if (frame == 0) {
+                    plane.respawnNearestCarrier(world_objects.carriers[0..world_objects.carrier_count]);
+                }
+                input.boost = true;
+                input.pitch = if (frame > 60) 0.18 else 0.0;
+                plane.speed = @min(520.0, plane.speed + 450.0 * frame_dt);
+                plane.setGear(9);
+            } else if (frame == 150 and world_objects.city_count > 0) {
+                const c0 = world_objects.cities[0];
+                const d_st = planet.cityPointDir(c0, 0.0, -460.0);
+                plane.spawnAt(d_st, c0.north);
+                plane.pos = d_st.scale(planet.surfaceRadius(d_st) + 26.0);
+                plane.prev_pos = plane.pos;
+                plane.setGear(9);
+                plane.speed = 460.0;
+                cam.pos = plane.pos.sub(plane.dir.scale(14.0)).add(d_st.scale(4.0));
+            } else if (frame >= 150 and frame < 360) {
+                input.boost = true;
+                input.roll = 0.42;
+                input.pitch = 0.13;
+            } else if (frame == 360) {
+                if (battle.fighter_count > 0) {
+                    for (battle.fighters[0..battle.fighter_count], 0..) |*tgt, ti| {
+                        if (tgt.isAlive() and tgt.team == .enemy) {
+                            plane.pos = tgt.pos.sub(tgt.dir.scale(160.0)).add(tgt.rot.rotate(Vec3.up).scale(14.0));
+                            plane.prev_pos = plane.pos;
+                            plane.rot = tgt.rot;
+                            plane.dir = tgt.dir;
+                            plane.speed = tgt.speed + 40.0;
+                            plane.locked_target = ti;
+                            plane.targeting_mode = true;
+                            plane.bfm_phase = .firing_solution;
+                            plane.firing_solution = true;
+                            cam.pos = plane.pos.sub(plane.dir.scale(13.0)).add(plane.pos.norm().scale(3.8));
+                            break;
+                        }
+                    }
+                }
+            } else if (frame >= 360 and frame < 540) {
+                demo_fire_l = true;
+                if (frame == 380 or frame == 430) demo_fire_r = true;
+                input.pitch = 0.07;
+            } else if (frame >= 540 and frame < 750) {
+                input.boost = true;
+                input.pitch = 0.65;
+                input.roll = 0.25;
+                plane.speed = 580.0;
+            }
+        }
+
         var net_fire_l = false;
         var net_fire_r = false;
         var net_fire_bomb = false;
@@ -3377,9 +3620,9 @@ pub fn main(init: std.process.Init.Minimal) !void {
             }
 
             const can_fire = !plane.is_dead and plane.carrier_mode == .free_flight;
-            const fire_l = can_fire and (win.down(.enter) or win.enter_pressed);
-            const fire_r = can_fire and (win.down(.right_shift) or win.right_shift_pressed);
-            const fire_bomb = can_fire and (win.down(.c_key) or win.down(.right_ctrl) or win.bomb_pressed);
+            const fire_l = can_fire and (win.down(.enter) or win.enter_pressed or demo_fire_l);
+            const fire_r = can_fire and (win.down(.right_shift) or win.right_shift_pressed or demo_fire_r);
+            const fire_bomb = can_fire and (win.down(.c_key) or win.down(.right_ctrl) or win.bomb_pressed or demo_fire_bomb);
             win.mouse_left_clicked = false;
             win.mouse_right_clicked = false;
             win.enter_pressed = false;
@@ -3653,7 +3896,7 @@ pub fn main(init: std.process.Init.Minimal) !void {
                     cam.fov = math.lerpf(math.radians(65.0), math.radians(68.0), s);
                 }
             } else {
-                cam.zoom_active = win.down(.z_key) or (showcase and frame >= 48 and frame <= 53);
+                cam.zoom_active = win.down(.z_key) or (showcase and frame >= 48 and frame <= 53) or (record_demo == 2 and frame >= 540 and frame < 1080);
                 cam.update(frame_dt, ppos, prot, plane.speed, plane.params);
             }
         }
@@ -6807,6 +7050,46 @@ pub fn main(init: std.process.Init.Minimal) !void {
         const cpu_sim_ms = (nowSeconds() - frame_start_time) * 1000.0;
         const clear_col = computeSkyColor(cam.pos, sun_angle);
         if (!try r.drawFrame(vp, draw_list[0..n], ui_start_idx, clear_col, sun_angle)) try r.recreate(win.width, win.height);
+        if (r.rec_active) {
+            try r.recordCurrentFrame();
+        }
+
+        if (record_demo > 0 and frame >= rec_total_frames) {
+            log.info("Finished recording demo {d} ({d} frames). Finalizing...", .{ record_demo, frame });
+            r.stopRecording();
+            audio.global_audio.stopWavRecording();
+
+            const raw_vid: []const u8 = switch (record_demo) {
+                1 => "/tmp/airplane_demo1_raw.mp4",
+                2 => "/tmp/airplane_demo2_raw.mp4",
+                else => "/tmp/airplane_demo3_raw.mp4",
+            };
+            const raw_aud: []const u8 = switch (record_demo) {
+                1 => "/tmp/airplane_demo1_audio.wav",
+                2 => "/tmp/airplane_demo2_audio.wav",
+                else => "/tmp/airplane_demo3_audio.wav",
+            };
+            const final_out: []const u8 = switch (record_demo) {
+                1 => "docs/videos/carrier_sortie_mission.mp4",
+                2 => "docs/videos/planetary_strike_theater.mp4",
+                else => "docs/videos/hypersonic_action_highlight.mp4",
+            };
+            const art_out: []const u8 = switch (record_demo) {
+                1 => "/home/jamil/.gemini/antigravity/brain/d667b12c-975b-4555-9fbc-598eee4dbad2/carrier_sortie_mission.mp4",
+                2 => "/home/jamil/.gemini/antigravity/brain/d667b12c-975b-4555-9fbc-598eee4dbad2/planetary_strike_theater.mp4",
+                else => "/home/jamil/.gemini/antigravity/brain/d667b12c-975b-4555-9fbc-598eee4dbad2/hypersonic_action_highlight.mp4",
+            };
+
+            var mux_buf: [1024]u8 = undefined;
+            const mux_cmd = std.fmt.bufPrint(&mux_buf, "ffmpeg -y -i \"{s}\" -i \"{s}\" -c:v copy -c:a aac -b:a 192k -shortest \"{s}\" 2>/dev/null && cp \"{s}\" \"{s}\"", .{
+                raw_vid, raw_aud, final_out, final_out, art_out
+            }) catch unreachable;
+            mux_buf[mux_cmd.len] = 0;
+            log.info("Running mux & copy: {s}", .{mux_buf[0..mux_cmd.len]});
+            _ = c.system(mux_buf[0..mux_cmd.len :0].ptr);
+            log.info("Demo recording completed successfully: {s}", .{final_out});
+            break;
+        }
         const frame_end_time = nowSeconds();
         const full_frame_ms = (frame_end_time - frame_start_time) * 1000.0;
 
@@ -6900,6 +7183,13 @@ pub fn main(init: std.process.Init.Minimal) !void {
             }
         }
         frame += 1;
+        if (record_demo > 0) {
+            const target_frame_ns: u64 = 1_000_000_000 / 30;
+            const cur_elapsed_ns = @as(u64, @intFromFloat((nowSeconds() - frame_start_time) * 1e9));
+            if (cur_elapsed_ns < target_frame_ns) {
+                _ = c.usleep(@intCast((target_frame_ns - cur_elapsed_ns) / 1000));
+            }
+        }
         if (now >= next_report) {
             next_report = now + 1.0;
             const sun_dir = Vec3.init(@cos(sun_angle), 0.22, @sin(sun_angle)).norm();

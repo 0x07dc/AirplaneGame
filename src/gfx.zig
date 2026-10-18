@@ -72,6 +72,13 @@ pub const Renderer = struct {
     uncapped: bool = false,
     actual_present_mode: c.VkPresentModeKHR = c.VK_PRESENT_MODE_FIFO_KHR,
     gpu_name: [256]u8 = [_]u8{0} ** 256,
+    rec_buf: c.VkBuffer = null,
+    rec_mem: c.VkDeviceMemory = null,
+    rec_ptr: [*]const u8 = undefined,
+    rec_pipe: ?*c.FILE = null,
+    rec_width: u32 = 0,
+    rec_height: u32 = 0,
+    rec_active: bool = false,
 
     pub const FrameTiming = struct {
         gpu_wait_ms: f32 = 0.0,
@@ -739,7 +746,125 @@ pub const Renderer = struct {
         log.info("saved screenshot: {s} ({d}x{d})", .{ path, w, h });
     }
 
+    /// Opens an ffmpeg raw video pipe and pre-allocates an optimized Vulkan staging buffer for zero-drop video capture.
+    pub fn startRecording(self: *Renderer, output_path: [*:0]const u8, fps: u32) !void {
+        if (self.rec_active) return;
+        const w = self.extent.width;
+        const h = self.extent.height;
+        const byte_len: usize = @as(usize, w) * @as(usize, h) * 4;
+
+        const bci = c.VkBufferCreateInfo{
+            .sType = c.VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+            .size = byte_len,
+            .usage = c.VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            .sharingMode = c.VK_SHARING_MODE_EXCLUSIVE,
+        };
+        try vk(c.vkCreateBuffer(self.device, &bci, null, &self.rec_buf));
+
+        var req: c.VkMemoryRequirements = undefined;
+        c.vkGetBufferMemoryRequirements(self.device, self.rec_buf, &req);
+        const mai = c.VkMemoryAllocateInfo{
+            .sType = c.VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+            .allocationSize = req.size,
+            .memoryTypeIndex = try self.findMemType(req.memoryTypeBits, c.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | c.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT),
+        };
+        try vk(c.vkAllocateMemory(self.device, &mai, null, &self.rec_mem));
+        try vk(c.vkBindBufferMemory(self.device, self.rec_buf, self.rec_mem, 0));
+
+        var ptr: ?*anyopaque = null;
+        try vk(c.vkMapMemory(self.device, self.rec_mem, 0, byte_len, 0, &ptr));
+        self.rec_ptr = @ptrCast(ptr.?);
+
+        var cmd_buf: [1024]u8 = undefined;
+        const cmd_str = try std.fmt.bufPrint(&cmd_buf, "ffmpeg -y -f rawvideo -vcodec rawvideo -s {d}x{d} -pix_fmt rgb24 -r {d} -i - -c:v libx264 -preset veryfast -crf 20 -pix_fmt yuv420p \"{s}\" 2>/dev/null", .{ w, h, fps, output_path });
+        cmd_buf[cmd_str.len] = 0;
+
+        self.rec_pipe = c.popen(cmd_buf[0..cmd_str.len :0].ptr, "w");
+        if (self.rec_pipe == null) return error.PopenFailed;
+        self.rec_width = w;
+        self.rec_height = h;
+        self.rec_active = true;
+        log.info("Started video recording to {s} ({d}x{d} @ {d}fps)", .{ output_path, w, h, fps });
+    }
+
+    /// Captures the current presented frame into the video pipe.
+    pub fn recordCurrentFrame(self: *Renderer) !void {
+        if (!self.rec_active) return;
+        const pipe = self.rec_pipe orelse return;
+        _ = c.vkDeviceWaitIdle(self.device);
+
+        const w = self.rec_width;
+        const h = self.rec_height;
+
+        try vk(c.vkResetCommandBuffer(self.cmd, 0));
+        const bi = c.VkCommandBufferBeginInfo{
+            .sType = c.VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+            .flags = c.VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+        };
+        try vk(c.vkBeginCommandBuffer(self.cmd, &bi));
+        const img = self.images[self.last_image_idx];
+        self.barrier(img, c.VK_IMAGE_ASPECT_COLOR_BIT, c.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, c.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, c.VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, c.VK_PIPELINE_STAGE_2_TRANSFER_BIT, 0, c.VK_ACCESS_2_TRANSFER_READ_BIT);
+
+        const region = c.VkBufferImageCopy{
+            .bufferOffset = 0,
+            .bufferRowLength = 0,
+            .bufferImageHeight = 0,
+            .imageSubresource = .{ .aspectMask = c.VK_IMAGE_ASPECT_COLOR_BIT, .mipLevel = 0, .baseArrayLayer = 0, .layerCount = 1 },
+            .imageOffset = .{ .x = 0, .y = 0, .z = 0 },
+            .imageExtent = .{ .width = w, .height = h, .depth = 1 },
+        };
+        c.vkCmdCopyImageToBuffer(self.cmd, img, c.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, self.rec_buf, 1, &region);
+        self.barrier(img, c.VK_IMAGE_ASPECT_COLOR_BIT, c.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, c.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, c.VK_PIPELINE_STAGE_2_TRANSFER_BIT, c.VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT, c.VK_ACCESS_2_TRANSFER_READ_BIT, 0);
+        try vk(c.vkEndCommandBuffer(self.cmd));
+
+        const si = c.VkSubmitInfo{
+            .sType = c.VK_STRUCTURE_TYPE_SUBMIT_INFO,
+            .commandBufferCount = 1,
+            .pCommandBuffers = &self.cmd,
+        };
+        try vk(c.vkQueueSubmit(self.queue, 1, &si, null));
+        _ = c.vkQueueWaitIdle(self.queue);
+
+        const bgra = self.rec_ptr;
+        var row_rgb: [4096 * 3]u8 = undefined;
+        const row_w = @min(@as(usize, w), 4096);
+        var y: usize = 0;
+        while (y < h) : (y += 1) {
+            var x: usize = 0;
+            const y_off = y * @as(usize, w) * 4;
+            while (x < row_w) : (x += 1) {
+                const p = y_off + x * 4;
+                row_rgb[x * 3 + 0] = bgra[p + 2]; // R
+                row_rgb[x * 3 + 1] = bgra[p + 1]; // G
+                row_rgb[x * 3 + 2] = bgra[p + 0]; // B
+            }
+            _ = c.fwrite(&row_rgb, 1, row_w * 3, pipe);
+        }
+    }
+
+    /// Stops video recording, flushes ffmpeg encoder, and frees staging memory.
+    pub fn stopRecording(self: *Renderer) void {
+        if (!self.rec_active) return;
+        _ = c.vkDeviceWaitIdle(self.device);
+        if (self.rec_pipe) |pipe| {
+            _ = c.pclose(pipe);
+            self.rec_pipe = null;
+        }
+        if (self.rec_mem) |mem| {
+            c.vkUnmapMemory(self.device, mem);
+            c.vkFreeMemory(self.device, mem, null);
+            self.rec_mem = null;
+        }
+        if (self.rec_buf) |buf| {
+            c.vkDestroyBuffer(self.device, buf, null);
+            self.rec_buf = null;
+        }
+        self.rec_active = false;
+        log.info("Video recording stopped.", .{});
+    }
+
     pub fn deinit(self: *Renderer) void {
+        self.stopRecording();
         if (self.device == null) return;
         _ = c.vkDeviceWaitIdle(self.device);
         self.destroySwapchain();
