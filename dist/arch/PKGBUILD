@@ -1,6 +1,6 @@
 # Maintainer: 0x07dc <voss.jamil@gmail.com>
 pkgname=airplane-game
-pkgver=0.1.0
+pkgver=0.1.1
 pkgrel=1
 pkgdesc="High-performance low-poly 3D dogfighting simulator built in Zig, Vulkan 1.3, Wayland, and ALSA"
 arch=('x86_64' 'aarch64')

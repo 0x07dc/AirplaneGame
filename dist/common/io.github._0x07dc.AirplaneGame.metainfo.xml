@@ -94,6 +94,16 @@
   </content_rating>
 
   <releases>
+    <release version="0.1.1" date="2026-10-17">
+      <description>
+        <p>Tactical and multiplayer network enhancements:</p>
+        <ul>
+          <li>Configurable master server with local domain:port editor (M key) and master_server.txt file override.</li>
+          <li>Automated master server connectivity defaulting to jamilvoss.cyou:8080.</li>
+          <li>Emergency carrier recovery shortcut (Y key) with 15-second respawn cooldown.</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.1.0" date="2026-10-17">
       <description>
         <p>Initial release featuring:</p>

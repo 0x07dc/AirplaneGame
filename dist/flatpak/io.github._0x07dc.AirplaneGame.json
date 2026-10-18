@@ -49,8 +49,7 @@
         {
           "type": "git",
           "url": "https://github.com/0x07dc/AirplaneGame.git",
-          "tag": "v0.1.0",
-          "commit": "cb3657e717c6e24ac9511c7517b3fe696d1a314d"
+          "tag": "v0.1.1"
         }
       ]
     }
