@@ -1,0 +1,38 @@
+name: Snap Package Build & CI
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-snap:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Zig Compiler
+        uses: mlugg/setup-zig@v1
+        with:
+          version: 0.16.0
+
+      - name: Install System Build Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwayland-dev libvulkan-dev libasound2-dev wayland-protocols
+
+      - name: Build Native Binary
+        run: |
+          zig build -Doptimize=ReleaseFast -Duse-precompiled-shaders=true
+
+      - name: Build Snapcraft Package
+        uses: snapcore/action-build@v1
+        id: snapcraft
+
+      - name: Upload Built Snap Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: airplane-game-snap
+          path: ${{ steps.snapcraft.outputs.snap }}
