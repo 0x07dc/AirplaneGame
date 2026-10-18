@@ -3424,19 +3424,40 @@ pub fn main(init: std.process.Init.Minimal) !void {
                 if (frame == 1140 or frame == 1210 or frame == 1280) demo_fire_bomb = true;
                 if (frame % 8 < 3) demo_fire_l = true;
             } else if (frame == 1500 and world_objects.blimp_count > 0) {
-                const bl = world_objects.blimps[0];
-                const tr = planet.evalBlimpAgent(bl, sim_time);
-                plane.pos = tr.pos.add(tr.dir.scale(35.0)).sub(tr.fwd.scale(240.0));
+                // Intercept & engage Evil Zeppelin Dreadnought Boss
+                const bl = &world_objects.blimps[0];
+                bl.alive = true;
+                bl.health = 50.0;
+                const tr = planet.evalBlimpAgent(bl.*, sim_time);
+                const bl_right = tr.rot.rotate(Vec3.init(1, 0, 0));
+                const bl_up = tr.dir;
+                plane.carrier_mode = .free_flight;
+                plane.health = 100.0;
+                plane.setGear(1);
+                plane.speed = 90.0;
+
+                const bl_target = tr.pos.add(bl_right.scale(4.0)).add(tr.fwd.scale(2.0));
+                plane.pos = tr.pos.add(bl_right.scale(22.0)).sub(tr.fwd.scale(65.0)).add(bl_up.scale(-1.0));
+                const f = bl_target.sub(plane.pos).norm();
+                plane.dir = f;
+                const z_axis = f.scale(-1);
+                const x_axis = bl_up.cross(z_axis).norm();
+                const y_axis = z_axis.cross(x_axis).norm();
+                plane.rot = planet.fromBasis(x_axis, y_axis, z_axis);
                 plane.prev_pos = plane.pos;
-                plane.rot = tr.rot;
-                plane.dir = tr.fwd;
-                plane.speed = 250.0;
-                cam.pos = plane.pos.sub(plane.dir.scale(14.0)).add(tr.dir.scale(4.5));
-            } else if (frame >= 1500 and frame < 2100) {
-                if (frame % 4 < 2) demo_fire_l = true;
-                if (frame % 40 == 10) demo_fire_r = true;
-                input.pitch = 0.05;
-                input.roll = 0.20;
+                plane.prev_rot = plane.rot;
+                cam.pos = plane.pos.sub(f.scale(13.0)).add(y_axis.scale(3.5));
+                cam.up = y_axis;
+            } else if (frame >= 1500 and frame < 1720) {
+                input.pitch = 0.0;
+                input.roll = 0.0;
+                if (frame % 3 < 2) demo_fire_l = true;
+                if (frame == 1515 or frame == 1550 or frame == 1590) demo_fire_r = true;
+            } else if (frame >= 1720 and frame < 2100) {
+                input.pitch = 0.12;
+                input.roll = 0.35;
+                input.boost = true;
+                plane.setGear(6);
             }
         } else if (record_demo == 3) {
             // Demo 3: Hypersonic Top Gun highlight reel (25s)
