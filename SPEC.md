@@ -523,7 +523,41 @@ The top-level application loop transitions through strict states:
   - AppStream Metainfo: `/usr/share/metainfo/io.github._0x07dc.AirplaneGame.metainfo.xml`
   - Icons: `/usr/share/icons/hicolor/{64x64,128x128,256x256,512x512,scalable}/apps/`
 
-### 12.3 Automated Test & Verification Matrix
+### 12.3 Debian & Ubuntu (.deb) Specification
+- **Package Name**: `airplane-game`
+- **Current Production Release**: `v0.1.1` (`airplane-game_0.1.1_amd64.deb`).
+- **Target Distributions**: Debian 12 (Bookworm)+, Ubuntu 22.04 LTS+, Ubuntu 24.04 LTS+, Linux Mint 21+, Pop!_OS 22.04+.
+- **Binary Dependencies**: `libc6 (>= 2.34)`, `libwayland-client0 (>= 1.20.0)`, `libvulkan1 (>= 1.3)`, `libasound2 (>= 1.2.0)`.
+- **Direct Native Installation**:
+  ```bash
+  curl -LO https://github.com/0x07dc/AirplaneGame/releases/download/v0.1.1/airplane-game_0.1.1_amd64.deb
+  sudo apt install ./airplane-game_0.1.1_amd64.deb
+  # Or install locally compiled repository package:
+  sudo apt install ./dist/debian/airplane-game_0.1.1_amd64.deb
+  ```
+- **Automated Package Assembly**:
+  ```bash
+  python3 dist/debian/build_deb.py
+  ```
+- **FHS Integration**:
+  - Binary: `/usr/bin/airplane_game`
+  - Desktop Entry: `/usr/share/applications/io.github._0x07dc.AirplaneGame.desktop`
+  - AppStream Metainfo: `/usr/share/metainfo/io.github._0x07dc.AirplaneGame.metainfo.xml`
+  - Hicolor Icons: `/usr/share/icons/hicolor/{64x64,128x128,256x256,512x512,scalable}/apps/`
+  - Documentation & Copyright: `/usr/share/doc/airplane-game/copyright`
+
+### 12.4 Canonical Snapcraft Specification
+- **Package Name**: `airplane-game`
+- **Base**: `core24`
+- **Confinement**: `strict`
+- **Plugs**: `wayland`, `opengl`, `audio-playback`, `network`, `network-bind`.
+- **Manifest Location**: `snap/snapcraft.yaml`.
+- **User Installation**:
+  ```bash
+  sudo snap install airplane-game
+  ```
+
+### 12.5 Automated Test & Verification Matrix
 Every build must pass the following headless verification test suite before distribution:
 ```bash
 # 1. Aerodynamic physics and flight envelope verification:
@@ -552,6 +586,9 @@ desktop-file-validate dist/common/io.github._0x07dc.AirplaneGame.desktop
 
 # 9. Arch Linux package integrity verification:
 pacman -Qip dist/arch/airplane-game-0.1.1-1-x86_64.pkg.tar.zst
+
+# 10. Debian package archive integrity verification:
+ar -t dist/debian/airplane-game_0.1.1_amd64.deb
 ```
 
 ---

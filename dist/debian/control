@@ -1,0 +1,19 @@
+Package: airplane-game
+Version: 0.1.1
+Section: games
+Priority: optional
+Architecture: amd64
+Maintainer: 0x07dc <voss.jamil@gmail.com>
+Installed-Size: 2592
+Depends: libc6 (>= 2.34), libwayland-client0 (>= 1.20.0), libvulkan1 (>= 1.3), libasound2 (>= 1.2.0)
+Suggests: nvidia-driver | mesa-vulkan-drivers
+Homepage: https://github.com/0x07dc/AirplaneGame
+Description: High-performance low-poly 3D dogfighting simulator
+ Airplane Combat Simulator is a tactical 3D flight combat simulator and aerial
+ dogfighting engine engineered in pure Zig with Vulkan 1.3 hardware acceleration,
+ native Wayland client windowing, and real-time ALSA audio synthesis.
+ .
+ Features include a spherical planet with 22 procedural metropolises, naval
+ aircraft carrier operations with arrestor gear, automated master server matchmaking,
+ 60 Hz non-blocking UDP multiplayer with Hermite client interpolation, and
+ an avionics HUD with pitch ladder, CCIP bombs, and Sidewinder missiles.

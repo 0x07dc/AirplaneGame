@@ -18,9 +18,9 @@
 1. [What is Airplane Combat Simulator?](#what-is-airplane-combat-simulator)
 2. [Exciting Features](#exciting-features)
 3. [Installing & Obtaining for Your Linux Distro](#installing--obtaining-for-your-linux-distro)
-   - [Arch Linux, Manjaro & EndeavourOS (AUR)](#arch-linux-manjaro--endeavouros-aur)
+   - [Arch Linux, Manjaro & EndeavourOS (Pacman / AUR)](#arch-linux-manjaro--endeavouros)
+   - [Ubuntu, Debian, Linux Mint & Pop!_OS (APT .deb & Snap)](#ubuntu-debian-linux-mint--pop_os)
    - [Fedora, RHEL & CentOS Stream (Flatpak / Flathub)](#fedora-rhel--centos-stream-flatpak--flathub)
-   - [Ubuntu, Debian, Linux Mint & Pop!_OS (Flatpak / Flathub)](#ubuntu-debian-linux-mint--pop_os-flatpak--flathub)
    - [openSUSE Tumbleweed & Leap (Flatpak / Flathub)](#opensuse-tumbleweed--leap-flatpak--flathub)
    - [Building Locally from Source (Any Distro)](#building-locally-from-source-any-distro)
 4. [Title Screen & Elevator Lounge Music](#title-screen--elevator-lounge-music)
@@ -129,22 +129,46 @@ makepkg -si
 
 ---
 
-### Ubuntu, Debian, Linux Mint & Pop!_OS (Flatpak / Flathub)
+### Ubuntu, Debian, Linux Mint & Pop!_OS
 
-1. **Install Flatpak support**:
-   ```bash
-   sudo apt update
-   sudo apt install -y flatpak
-   ```
-2. **Add the Flathub repository**:
-   ```bash
-   flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
-   ```
-3. **Install and Run**:
-   ```bash
-   flatpak install flathub io.github._0x07dc.AirplaneGame
-   flatpak run io.github._0x07dc.AirplaneGame
-   ```
+#### Option 1: Direct Native Debian Package (`.deb` via APT)
+Download and install the native `.deb` package with automatic dependency resolution:
+```bash
+# Download from GitHub release:
+curl -LO https://github.com/0x07dc/AirplaneGame/releases/download/v0.1.1/airplane-game_0.1.1_amd64.deb
+
+# Install using apt:
+sudo apt install ./airplane-game_0.1.1_amd64.deb
+
+# Or install directly from the local repository build:
+sudo apt install ./dist/debian/airplane-game_0.1.1_amd64.deb
+```
+*(Alternatively, use `dpkg`)*:
+```bash
+sudo dpkg -i airplane-game_0.1.1_amd64.deb
+sudo apt install -f  # Resolve any missing system packages
+```
+
+#### Option 2: Snap Package (Ubuntu Store)
+Install via Canonical Snapcraft:
+```bash
+sudo snap install airplane-game
+```
+
+#### Option 3: Build `.deb` Package Locally
+```bash
+# Build the binary and assemble the Debian package:
+python3 dist/debian/build_deb.py
+sudo apt install ./dist/debian/airplane-game_0.1.1_amd64.deb
+```
+
+#### Option 4: Flatpak / Flathub
+```bash
+sudo apt update && sudo apt install -y flatpak
+flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+flatpak install flathub io.github._0x07dc.AirplaneGame
+flatpak run io.github._0x07dc.AirplaneGame
+```
 
 ---
 

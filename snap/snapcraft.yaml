@@ -1,0 +1,41 @@
+name: airplane-game
+base: core24
+version: '0.1.1'
+summary: High-performance low-poly 3D dogfighting simulator
+description: |
+  Airplane Combat Simulator is a tactical 3D flight combat simulator and aerial
+  dogfighting engine engineered in pure Zig with Vulkan 1.3 hardware acceleration,
+  native Wayland client windowing, and real-time ALSA audio synthesis.
+
+  Features include a spherical planet with 22 procedural metropolises, naval
+  aircraft carrier operations with arrestor gear, automated master server matchmaking,
+  60 Hz non-blocking UDP multiplayer with Hermite client interpolation, and
+  an avionics HUD with pitch ladder, CCIP bombs, and Sidewinder missiles.
+
+grade: stable
+confinement: strict
+
+apps:
+  airplane-game:
+    command: usr/bin/airplane_game
+    extensions: [gnome]
+    plugs:
+      - wayland
+      - opengl
+      - audio-playback
+      - network
+      - network-bind
+
+parts:
+  airplane-game:
+    plugin: nil
+    override-build: |
+      mkdir -p $CRAFT_PART_INSTALL/usr/bin
+      mkdir -p $CRAFT_PART_INSTALL/usr/share/applications
+      mkdir -p $CRAFT_PART_INSTALL/usr/share/metainfo
+      mkdir -p $CRAFT_PART_INSTALL/usr/share/icons/hicolor
+
+      cp -a zig-out/bin/airplane_game $CRAFT_PART_INSTALL/usr/bin/
+      cp -a dist/common/io.github._0x07dc.AirplaneGame.desktop $CRAFT_PART_INSTALL/usr/share/applications/
+      cp -a dist/common/io.github._0x07dc.AirplaneGame.metainfo.xml $CRAFT_PART_INSTALL/usr/share/metainfo/
+      cp -a dist/common/icons/* $CRAFT_PART_INSTALL/usr/share/icons/hicolor/

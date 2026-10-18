@@ -1552,6 +1552,7 @@
 
       <div class="tab-bar" role="tablist">
         <button type="button" class="tab-btn active" role="tab" aria-selected="true" data-tab="tab-arch">Arch / Manjaro (Pacman)</button>
+        <button type="button" class="tab-btn" role="tab" aria-selected="false" data-tab="tab-debian">Ubuntu / Debian (APT)</button>
         <button type="button" class="tab-btn" role="tab" aria-selected="false" data-tab="tab-flatpak">Flatpak <span class="pill-coming-soon">Coming Soon</span></button>
         <button type="button" class="tab-btn" role="tab" aria-selected="false" data-tab="tab-source">Build from Source</button>
         <button type="button" class="tab-btn" role="tab" aria-selected="false" data-tab="tab-portable">Portable Linux Binary</button>
@@ -1578,6 +1579,32 @@
         <div class="cmd-line">
           <code>git clone https://github.com/0x07dc/AirplaneGame.git &amp;&amp; cd AirplaneGame/dist/arch &amp;&amp; makepkg -si</code>
           <button type="button" class="copy-btn" onclick="copySnippet('git clone https://github.com/0x07dc/AirplaneGame.git && cd AirplaneGame/dist/arch && makepkg -si', this)">Copy</button>
+        </div>
+
+        <p style="color: var(--text-muted); margin: 1.25rem 0 0.75rem;"><strong>Launch Game:</strong></p>
+        <div class="cmd-line">
+          <code>airplane_game</code>
+          <button type="button" class="copy-btn" onclick="copySnippet('airplane_game', this)">Copy</button>
+        </div>
+      </div>
+
+      <div id="tab-debian" class="tab-pane" role="tabpanel">
+        <p style="color: var(--text-muted); margin-bottom: 0.75rem;"><strong>Direct Native Package (.deb via APT):</strong> Download and install the native Debian package with automatic dependency resolution:</p>
+        <div class="cmd-line">
+          <code>curl -LO https://github.com/0x07dc/AirplaneGame/releases/download/v0.1.1/airplane-game_0.1.1_amd64.deb &amp;&amp; sudo apt install ./airplane-game_0.1.1_amd64.deb</code>
+          <button type="button" class="copy-btn" onclick="copySnippet('curl -LO https://github.com/0x07dc/AirplaneGame/releases/download/v0.1.1/airplane-game_0.1.1_amd64.deb && sudo apt install ./airplane-game_0.1.1_amd64.deb', this)">Copy</button>
+        </div>
+
+        <p style="color: var(--text-muted); margin: 1.25rem 0 0.75rem;"><strong>Canonical Snap (Ubuntu Store):</strong> Install via Ubuntu's default Snap system:</p>
+        <div class="cmd-line">
+          <code>sudo snap install airplane-game</code>
+          <button type="button" class="copy-btn" onclick="copySnippet('sudo snap install airplane-game', this)">Copy</button>
+        </div>
+
+        <p style="color: var(--text-muted); margin: 1.25rem 0 0.75rem;"><strong>Build &amp; Install .deb Package Locally from Source:</strong></p>
+        <div class="cmd-line">
+          <code>git clone https://github.com/0x07dc/AirplaneGame.git &amp;&amp; cd AirplaneGame &amp;&amp; python3 dist/debian/build_deb.py &amp;&amp; sudo apt install ./dist/debian/airplane-game_0.1.1_amd64.deb</code>
+          <button type="button" class="copy-btn" onclick="copySnippet('git clone https://github.com/0x07dc/AirplaneGame.git && cd AirplaneGame && python3 dist/debian/build_deb.py && sudo apt install ./dist/debian/airplane-game_0.1.1_amd64.deb', this)">Copy</button>
         </div>
 
         <p style="color: var(--text-muted); margin: 1.25rem 0 0.75rem;"><strong>Launch Game:</strong></p>
@@ -1896,7 +1923,9 @@
         <div class="footer-col">
           <h4>Distribution</h4>
           <ul>
-            <li><a href="#install">Arch Linux (Pacman)</a></li>
+            <li><a href="#install">Arch Linux (Pacman / AUR)</a></li>
+            <li><a href="#install">Ubuntu / Debian (APT)</a></li>
+            <li><a href="#install">Canonical Snap (Snap Store)</a></li>
             <li><a href="#install">Flatpak (Coming Soon)</a></li>
             <li><a href="#install">Build from Source</a></li>
             <li><a href="#controls">Flight Doctrine</a></li>
