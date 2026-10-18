@@ -800,6 +800,44 @@ fn setAutopilotDisengagedAnnouncement(buf: *[48]u8) usize {
     return msg.len;
 }
 
+fn loadMasterServerConfig(net_mgr: *net.NetworkManager) void {
+    const paths = [_][*:0]const u8{
+        "master_server.txt",
+        "/tmp/master_server.txt",
+    };
+    for (paths) |path| {
+        if (c.fopen(path, "r")) |fp| {
+            defer _ = c.fclose(fp);
+            var buf: [128]u8 = undefined;
+            while (c.fgets(&buf, buf.len, fp)) |line_ptr| {
+                const line = std.mem.span(line_ptr);
+                const trimmed = std.mem.trim(u8, line, " \r\n\t");
+                if (trimmed.len == 0 or trimmed[0] == '#') continue;
+                if (std.mem.indexOfScalar(u8, trimmed, ':')) |colon_idx| {
+                    const host = trimmed[0..colon_idx];
+                    const port = std.fmt.parseInt(u16, trimmed[colon_idx + 1 ..], 10) catch 8080;
+                    net_mgr.master_client = net.MasterClient.init(host, port);
+                } else {
+                    net_mgr.master_client = net.MasterClient.init(trimmed, 8080);
+                }
+                log.info("LOADED MASTER SERVER FROM CONFIG FILE ({s}): {s}:{d}", .{ path, net_mgr.master_client.getHost(), net_mgr.master_client.master_port });
+                return;
+            }
+        }
+    }
+}
+
+fn saveMasterServerConfig(host: []const u8, port: u16) void {
+    if (c.fopen("master_server.txt", "w")) |fp| {
+        defer _ = c.fclose(fp);
+        var buf: [128]u8 = undefined;
+        if (std.fmt.bufPrint(&buf, "# Airplane Combat Simulator - Master Server Configuration\n# Format: <domain_or_ip>:<port>\n{s}:{d}\n", .{ host, port })) |str| {
+            _ = c.fwrite(str.ptr, 1, str.len, fp);
+            log.info("SAVED MASTER SERVER CONFIG: {s}", .{str});
+        } else |_| {}
+    }
+}
+
 const BenchmarkSample = struct {
     frame_time_ms: f64,
     cpu_sim_ms: f64,
@@ -1114,6 +1152,10 @@ pub fn main(init: std.process.Init.Minimal) !void {
     var current_callsign_len: usize = 5;
     var screenname_chosen: bool = false;
     var callsign_dirty: bool = true;
+    var editing_master_server: bool = false;
+    var master_input_buf: [64]u8 = [_]u8{0} ** 64;
+    var master_input_len: usize = 0;
+    var master_sub_dirty: bool = false;
 
     var announcement_timer: f32 = 0.0;
     var announcement_buf: [48]u8 = undefined;
@@ -1766,7 +1808,7 @@ pub fn main(init: std.process.Init.Minimal) !void {
     defer mp_head_b.deinit();
     const mesh_mp_header = try r.createMesh(mp_head_b.verts.items, mp_head_b.indices.items);
 
-    var mp_sub_b = try mesh.buildText(alloc, "TACTICAL UDP NETWORK // ACTIVE LAN DISCOVERY", 0.018, 0.028, 0.004, Vec3.init(0.5, 2.6, 3.6));
+    var mp_sub_b = try mesh.buildText(alloc, "MASTER: jamilvoss.cyou:8080 // [M] EDIT // [R] REFRESH", 0.016, 0.026, 0.004, Vec3.init(0.5, 2.6, 3.6));
     defer mp_sub_b.deinit();
     const mesh_mp_sub = try r.createMesh(mp_sub_b.verts.items, mp_sub_b.indices.items);
 
@@ -1796,7 +1838,7 @@ pub fn main(init: std.process.Init.Minimal) !void {
     defer btn_mp_host_b.deinit();
     const mesh_btn_mp_host = try r.createMesh(btn_mp_host_b.verts.items, btn_mp_host_b.indices.items);
 
-    var hint_mp_b = try mesh.buildText(alloc, "[UP/DOWN] SERVER    [ENTER] JOIN    [LEFT/RIGHT] HOST SLOTS: 8/16/32    [H] HOST    [ESC] BACK", 0.016, 0.026, 0.004, Vec3.init(0.6, 1.8, 2.6));
+    var hint_mp_b = try mesh.buildText(alloc, "[UP/DOWN] SELECT  [ENTER] JOIN  [M] MASTER SERVER  [H] HOST  [R] REFRESH  [ESC] BACK", 0.015, 0.025, 0.004, Vec3.init(0.6, 1.8, 2.6));
     defer hint_mp_b.deinit();
     const mesh_hint_mp = try r.createMesh(hint_mp_b.verts.items, hint_mp_b.indices.items);
 
@@ -2089,6 +2131,8 @@ pub fn main(init: std.process.Init.Minimal) !void {
     var net_mgr = net.NetworkManager.init();
     defer net_mgr.deinit();
     net_mgr.setScreenname(current_callsign[0..current_callsign_len]);
+    loadMasterServerConfig(&net_mgr);
+    master_sub_dirty = true;
 
     if (cli_master) |cm| {
         if (std.mem.indexOfScalar(u8, cm, ':')) |colon_idx| {
@@ -2752,7 +2796,7 @@ pub fn main(init: std.process.Init.Minimal) !void {
             if (win.typed_char) |ch| {
                 win.typed_char = null;
                 if (current_callsign_len < 12 and ch != ' ') {
-                    current_callsign[current_callsign_len] = ch;
+                    current_callsign[current_callsign_len] = std.ascii.toUpper(ch);
                     current_callsign_len += 1;
                     callsign_dirty = true;
                     net_mgr.setScreenname(current_callsign[0..current_callsign_len]);
@@ -2792,6 +2836,8 @@ pub fn main(init: std.process.Init.Minimal) !void {
                     0 => screen_state = .single_player_setup,
                     1 => {
                         screen_state = .multiplayer_lobby;
+                        editing_master_server = false;
+                        master_sub_dirty = true;
                         net_mgr.refreshServerList(now);
                     },
                     2 => {
@@ -2877,73 +2923,128 @@ pub fn main(init: std.process.Init.Minimal) !void {
             }
             if (win.esc_pressed) { win.esc_pressed = false; screen_state = .main_menu; }
         } else if (screen_state == .multiplayer_lobby) {
-            if (win.up_pressed) { win.up_pressed = false; net_mgr.server_list.selectPrev(); }
-            if (win.down_pressed) { win.down_pressed = false; net_mgr.server_list.selectNext(); }
-            if (win.left_pressed) {
-                win.left_pressed = false;
-                selected_fleet_idx = if (selected_fleet_idx == 0) 2 else selected_fleet_idx - 1;
-                sp_ai_choice = selected_fleet_idx;
-            }
-            if (win.right_pressed) {
-                win.right_pressed = false;
-                selected_fleet_idx = (selected_fleet_idx + 1) % 3;
-                sp_ai_choice = selected_fleet_idx;
-            }
-            if (win.enter_pressed or win.space_pressed) {
-                win.enter_pressed = false; win.space_pressed = false;
-                if (net_mgr.server_list.count > 0) {
-                    const srv = net_mgr.server_list.items[net_mgr.server_list.selected];
-                    if (std.mem.startsWith(u8, srv.getName(), "DIRECT CONNECT")) {
-                        screen_state = .direct_connect_setup;
-                        dc_dirty = true;
-                    } else {
-                        _ = net_mgr.connectToServer(srv.getIp(), srv.port);
-                        const p_cnt: usize = if (srv.players <= 8) 8 else if (srv.players <= 16) 16 else 32;
-                        battle.init(world_objects.carriers[0..world_objects.carrier_count], p_cnt);
-                        match_target_score = targetScoreForFleet(p_cnt);
-                        match_timer = 15.0 * 60.0;
-                        match_time_elapsed = 0.0;
-                        player_score = 0;
-                        battle.blue_score = 0;
-                        battle.red_score = 0;
-                        last_timer_sec = 9999;
-                        _ = battle.replaceAiWithPlayer(.friendly);
-                        announcement_timer = 4.0;
-                        const name_slice: []const u8 = if (current_callsign_len > 0) current_callsign[0..current_callsign_len] else "VIPER";
-                        announcement_len = setPlayerJoinedAnnouncement(&announcement_buf, name_slice);
-                        announcement_dirty = true;
-                        audio.global_audio.triggerTargetLockTone();
-                        plane.respawnNearestCarrier(world_objects.carriers[0..world_objects.carrier_count]);
-                        screen_state = .in_game;
+            if (editing_master_server) {
+                if (win.typed_char) |ch| {
+                    win.typed_char = null;
+                    if (master_input_len < 48 and ch != ' ') {
+                        master_input_buf[master_input_len] = ch;
+                        master_input_len += 1;
+                        master_sub_dirty = true;
                     }
                 }
+                if (win.backspace_pressed) {
+                    win.backspace_pressed = false;
+                    if (master_input_len > 0) {
+                        master_input_len -= 1;
+                        master_sub_dirty = true;
+                    }
+                }
+                if (win.enter_pressed or win.space_pressed) {
+                    win.enter_pressed = false;
+                    win.space_pressed = false;
+                    if (master_input_len > 0) {
+                        const input_str = master_input_buf[0..master_input_len];
+                        if (std.mem.indexOfScalar(u8, input_str, ':')) |c_idx| {
+                            const h = input_str[0..c_idx];
+                            const p = std.fmt.parseInt(u16, input_str[c_idx + 1 ..], 10) catch 8080;
+                            net_mgr.master_client = net.MasterClient.init(h, p);
+                        } else {
+                            net_mgr.master_client = net.MasterClient.init(input_str, 8080);
+                        }
+                        saveMasterServerConfig(net_mgr.master_client.getHost(), net_mgr.master_client.master_port);
+                        net_mgr.refreshServerList(now);
+                    }
+                    editing_master_server = false;
+                    master_sub_dirty = true;
+                }
+                if (win.esc_pressed) {
+                    win.esc_pressed = false;
+                    editing_master_server = false;
+                    master_sub_dirty = true;
+                }
+            } else {
+                if (win.m_pressed) {
+                    win.m_pressed = false;
+                    editing_master_server = true;
+                    const cur_host = net_mgr.master_client.getHost();
+                    const cur_port = net_mgr.master_client.master_port;
+                    var prefill_buf: [64]u8 = undefined;
+                    if (std.fmt.bufPrint(&prefill_buf, "{s}:{d}", .{ cur_host, cur_port })) |pf| {
+                        @memcpy(master_input_buf[0..pf.len], pf);
+                        master_input_len = pf.len;
+                    } else |_| {
+                        master_input_len = 0;
+                    }
+                    master_sub_dirty = true;
+                }
+                if (win.up_pressed) { win.up_pressed = false; net_mgr.server_list.selectPrev(); }
+                if (win.down_pressed) { win.down_pressed = false; net_mgr.server_list.selectNext(); }
+                if (win.left_pressed) {
+                    win.left_pressed = false;
+                    selected_fleet_idx = if (selected_fleet_idx == 0) 2 else selected_fleet_idx - 1;
+                    sp_ai_choice = selected_fleet_idx;
+                }
+                if (win.right_pressed) {
+                    win.right_pressed = false;
+                    selected_fleet_idx = (selected_fleet_idx + 1) % 3;
+                    sp_ai_choice = selected_fleet_idx;
+                }
+                if (win.enter_pressed or win.space_pressed) {
+                    win.enter_pressed = false; win.space_pressed = false;
+                    if (net_mgr.server_list.count > 0) {
+                        const srv = net_mgr.server_list.items[net_mgr.server_list.selected];
+                        if (std.mem.startsWith(u8, srv.getName(), "DIRECT CONNECT")) {
+                            screen_state = .direct_connect_setup;
+                            dc_dirty = true;
+                        } else {
+                            _ = net_mgr.connectToServer(srv.getIp(), srv.port);
+                            const p_cnt: usize = if (srv.players <= 8) 8 else if (srv.players <= 16) 16 else 32;
+                            battle.init(world_objects.carriers[0..world_objects.carrier_count], p_cnt);
+                            match_target_score = targetScoreForFleet(p_cnt);
+                            match_timer = 15.0 * 60.0;
+                            match_time_elapsed = 0.0;
+                            player_score = 0;
+                            battle.blue_score = 0;
+                            battle.red_score = 0;
+                            last_timer_sec = 9999;
+                            _ = battle.replaceAiWithPlayer(.friendly);
+                            announcement_timer = 4.0;
+                            const name_slice: []const u8 = if (current_callsign_len > 0) current_callsign[0..current_callsign_len] else "VIPER";
+                            announcement_len = setPlayerJoinedAnnouncement(&announcement_buf, name_slice);
+                            announcement_dirty = true;
+                            audio.global_audio.triggerTargetLockTone();
+                            plane.respawnNearestCarrier(world_objects.carriers[0..world_objects.carrier_count]);
+                            screen_state = .in_game;
+                        }
+                    }
+                }
+                if (win.h_pressed) {
+                    win.h_pressed = false;
+                    const p_cnt = fleet_options[selected_fleet_idx].count;
+                    _ = net_mgr.startHost(7777, @intCast(p_cnt));
+                    battle.init(world_objects.carriers[0..world_objects.carrier_count], p_cnt);
+                    match_target_score = targetScoreForFleet(p_cnt);
+                    match_timer = 15.0 * 60.0;
+                    match_time_elapsed = 0.0;
+                    player_score = 0;
+                    battle.blue_score = 0;
+                    battle.red_score = 0;
+                    last_timer_sec = 9999;
+                    _ = battle.replaceAiWithPlayer(.friendly);
+                    announcement_timer = 4.0;
+                    const name_slice: []const u8 = if (current_callsign_len > 0) current_callsign[0..current_callsign_len] else "VIPER";
+                    announcement_len = setPlayerJoinedAnnouncement(&announcement_buf, name_slice);
+                    announcement_dirty = true;
+                    audio.global_audio.triggerTargetLockTone();
+                    plane.respawnNearestCarrier(world_objects.carriers[0..world_objects.carrier_count]);
+                    screen_state = .in_game;
+                }
+                if (win.r_pressed) {
+                    win.r_pressed = false;
+                    net_mgr.refreshServerList(now);
+                }
+                if (win.esc_pressed) { win.esc_pressed = false; screen_state = .main_menu; }
             }
-            if (win.h_pressed) {
-                win.h_pressed = false;
-                const p_cnt = fleet_options[selected_fleet_idx].count;
-                _ = net_mgr.startHost(7777, @intCast(p_cnt));
-                battle.init(world_objects.carriers[0..world_objects.carrier_count], p_cnt);
-                match_target_score = targetScoreForFleet(p_cnt);
-                match_timer = 15.0 * 60.0;
-                match_time_elapsed = 0.0;
-                player_score = 0;
-                battle.blue_score = 0;
-                battle.red_score = 0;
-                last_timer_sec = 9999;
-                _ = battle.replaceAiWithPlayer(.friendly);
-                announcement_timer = 4.0;
-                const name_slice: []const u8 = if (current_callsign_len > 0) current_callsign[0..current_callsign_len] else "VIPER";
-                announcement_len = setPlayerJoinedAnnouncement(&announcement_buf, name_slice);
-                announcement_dirty = true;
-                audio.global_audio.triggerTargetLockTone();
-                plane.respawnNearestCarrier(world_objects.carriers[0..world_objects.carrier_count]);
-                screen_state = .in_game;
-            }
-            if (win.r_pressed) {
-                win.r_pressed = false;
-                net_mgr.refreshServerList(now);
-            }
-            if (win.esc_pressed) { win.esc_pressed = false; screen_state = .main_menu; }
         } else if (screen_state == .direct_connect_setup) {
             if (win.up_pressed) { win.up_pressed = false; dc_choice = if (dc_choice == 0) 6 else dc_choice - 1; }
             if (win.down_pressed) { win.down_pressed = false; dc_choice = (dc_choice + 1) % 7; }
@@ -3951,6 +4052,19 @@ pub fn main(init: std.process.Init.Minimal) !void {
                     }
                 }
             }
+        }
+
+        if (master_sub_dirty) {
+            master_sub_dirty = false;
+            var sub_txt_buf: [96]u8 = undefined;
+            const sub_txt = if (editing_master_server)
+                (std.fmt.bufPrint(&sub_txt_buf, "ENTER MASTER: [ {s}_ ]  [ENTER] SAVE  [ESC] CANCEL", .{master_input_buf[0..master_input_len]}) catch "ENTER MASTER")
+            else
+                (std.fmt.bufPrint(&sub_txt_buf, "MASTER: {s}:{d} // [M] EDIT // [R] REFRESH", .{ net_mgr.master_client.getHost(), net_mgr.master_client.master_port }) catch "MASTER SERVER");
+            const sub_color = if (editing_master_server) Vec3.init(4.8, 4.0, 0.4) else Vec3.init(0.5, 2.6, 3.6);
+            var sub_b = try mesh.buildText(alloc, sub_txt, 0.016, 0.026, 0.004, sub_color);
+            defer sub_b.deinit();
+            try r.updateMesh(mesh_mp_sub, sub_b.verts.items, sub_b.indices.items);
         }
 
         if (callsign_dirty) {

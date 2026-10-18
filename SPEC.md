@@ -48,9 +48,14 @@ AirplaneGame/
 │   ├── common/                   # FreeDesktop metadata (.desktop, .metainfo.xml, hicolor icons)
 │   ├── arch/                     # Arch Linux AUR package specs (PKGBUILD, PKGBUILD.git, .SRCINFO)
 │   └── flatpak/                  # Flathub Flatpak packaging manifests (YAML and JSON)
-└── tools/
-    ├── master_server.py          # Standalone Python HTTP master server & REST registry
-    └── test_master_integration.py# Master server validation test suite
+├── tools/
+│   ├── master_server.py          # Standalone Python HTTP master server & REST registry
+│   ├── test_master_integration.py# Master server validation test suite
+│   ├── airplane-master-server.service # Linux systemd unit file (24/7 service)
+│   ├── deploy_vps.sh             # Automated VPS deployment script
+│   ├── Dockerfile                # Lightweight Alpine container image
+│   └── docker-compose.yml        # Docker compose configuration
+└── master_server.txt             # User-configurable master server domain:port file
 ```
 
 ---
@@ -404,6 +409,37 @@ In-engine real-time lag simulation engine (cycled via `L` key):
   - 16 Players: Race to **100 points**
   - 32 Players: Race to **200 points**
 - **Match Termination**: Match halts immediately when either team hits the target score or when the 15-minute clock reaches zero. Transitions all participants into the holographic Game Over debriefing state.
+
+### 10.6 Automated Master Server & Matchmaking Architecture
+The engine features a lightweight, zero-dependency REST/HTTP master registry system (`tools/master_server.py`) for global multiplayer server indexing and discovery.
+
+#### 10.6.1 Master Server Resolution Hierarchy
+When initializing networking, the client determines its master server target via a strict priority waterfall:
+1. **Command Line Flag**: `--master <domain_or_ip>:<port>` (Highest precedence, runtime override).
+2. **Text Configuration File**: `master_server.txt` in the active executable directory or `/tmp/master_server.txt`.
+3. **Hardcoded Fallback**: `jamilvoss.cyou:8080`.
+
+#### 10.6.2 Interactive In-Game Configuration
+Within the `multiplayer_lobby` screen state:
+- Pressing **`M`** triggers interactive editing mode.
+- Users can type an arbitrary domain, IPv4 address, and custom port directly using the vector text engine (`win.typed_char`, supporting `.`, `:`, `-`, alphanumeric characters, and backspace).
+- Pressing **Enter** saves the address to `master_server.txt` using POSIX file I/O (`c.fopen`), re-initializes `MasterClient`, and triggers a live server list refresh.
+
+#### 10.6.3 REST Wire Protocol & Endpoints
+| Method | Endpoint | Description | Payload Format |
+| :---: | :--- | :--- | :--- |
+| `GET` | `/api/servers` | Returns JSON array of all active servers | None |
+| `GET` | `/api/servers.txt` | Pipe-delimited plaintext list for embedded clients | None (`name\|ip\|port\|players\|max_p\|ping\|mode`) |
+| `POST` | `/api/heartbeat` | Registers/refreshes server keepalive (15s interval) | JSON: `{"name","port","players","max_players","mode","ping"}` |
+| `POST` | `/api/unregister` | Explicit host deregistration on graceful shutdown | JSON: `{"port"}` |
+| `GET` | `/health` | Uptime and service health check | Plaintext `OK` |
+| `GET` | `/` | Web dashboard displaying active servers, player counts, latencies | HTML5 |
+
+#### 10.6.4 Production VPS Deployment & Resilience
+The master server is architected to run continuously (24/7/365) via:
+- **Systemd Unit** (`tools/airplane-master-server.service`): Managed under systemd with `Restart=always` and `RestartSec=3` for crash resilience and automatic launch on system boot.
+- **Automated VPS Script** (`tools/deploy_vps.sh`): Single-command deployment script provisioning Python 3, configuring systemd, and starting the daemon on any modern Linux server.
+- **Docker & Compose** (`tools/Dockerfile`, `tools/docker-compose.yml`): Containerized deployment with Alpine Linux and automated HTTP health checks.
 
 ---
 

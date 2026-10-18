@@ -314,17 +314,77 @@ Connect to the host:
 
 ---
 
-## Automated Master Server
+## Automated Master Server & Self-Hosting Guide
 
-For internet play and automated lobby discovery, the engine integrates with an Automated Master Server service (`tools/master_server.py`).
+For internet play and automated multiplayer lobby discovery, the engine integrates with an Automated Master Server registry service (`tools/master_server.py`). The default production master server is hosted at **`jamilvoss.cyou:8080`**.
 
-Start the lightweight Python master service:
+### How to Configure Your Master Server (`domain:port`)
+
+Players and server administrators can change the master server address in three ways:
+
+#### 1. Configuration Text File (`master_server.txt`)
+The game looks for `master_server.txt` in the game directory upon launch. To set your preferred master server, edit or create `master_server.txt`:
+```text
+# Airplane Combat Simulator - Master Server Configuration
+# Format: <domain_or_ip>:<port>
+jamilvoss.cyou:8080
+```
+Any custom address specified here automatically becomes the client's default on startup.
+
+#### 2. In-Game Server Browser (Interactive Hotkey: `M`)
+You can view and modify the active master server live from the in-game **Multiplayer Lobby**:
+- Press **`M`** to enter editing mode. The subheader changes to: `ENTER MASTER: [ domain:port_ ]`.
+- Type your custom domain or IP (supports letters, numbers, dots, colons, hyphens, and backspace).
+- Press **Enter** to save: the client updates its target, writes the new address to `master_server.txt` automatically, and reloads the active server list.
+- Press **Esc** to cancel editing without saving.
+
+#### 3. Command Line Override (`--master`)
+Override all file configurations from the terminal:
 ```bash
-python3 tools/master_server.py --port 8080
+./zig-out/bin/airplane_game --master custom.server.com:8080
 ```
 
-- When hosting with `--host`, the game registers with the master server and sends periodic heartbeats.
-- When opening the in-game **Multiplayer Lobby**, the engine dynamically queries the master server in the background, listing available hosts with real-time ping and player counts.
+---
+
+### Setting Up Your Own Master Server
+
+The master server is a standalone, zero-dependency Python service that tracks active game servers, handles heartbeats, and provides a web dashboard and REST API.
+
+#### Option A: Quick Standalone Run
+```bash
+python3 tools/master_server.py --host 0.0.0.0 --port 8080
+```
+
+#### Option B: 24/7 Linux VPS Deployment (Systemd Service)
+To run the server permanently on a Linux VPS (Debian, Ubuntu, Arch, Fedora) with auto-restart on system boot and crash recovery:
+
+1. Copy the server scripts to your VPS:
+   ```bash
+   scp tools/master_server.py tools/deploy_vps.sh user@your-vps-ip:~
+   ```
+2. Execute the automated installer:
+   ```bash
+   ssh user@your-vps-ip "sudo ./deploy_vps.sh 8080"
+   ```
+   This installs the service to `/opt/airplane_master_server/`, registers the systemd unit `airplane-master-server.service`, enables it across reboots, and starts it immediately.
+
+   Check service status and logs:
+   ```bash
+   systemctl status airplane-master-server
+   journalctl -u airplane-master-server -f
+   ```
+
+#### Option C: Docker & Docker Compose
+Deploy instantly inside an isolated container with auto-restart:
+```bash
+cd tools
+docker compose up -d
+```
+
+#### Endpoints & Health Check
+- **Web Dashboard**: `http://<your-domain-or-ip>:8080/`
+- **Health Check**: `http://<your-domain-or-ip>:8080/health`
+- **Active Servers API**: `http://<your-domain-or-ip>:8080/api/servers` (JSON) and `/api/servers.txt` (raw text)
 
 ---
 

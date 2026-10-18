@@ -211,6 +211,7 @@ pub const Window = struct {
         const pressed = state == c.WL_KEYBOARD_KEY_STATE_PRESSED;
         if (key < self.keys.len) self.keys[key] = pressed;
         if (pressed) {
+            const is_shift = (if (42 < self.keys.len) self.keys[42] else false) or (if (54 < self.keys.len) self.keys[54] else false);
             if (key == 14) {
                 self.backspace_pressed = true;
             } else if (key >= 2 and key <= 10) {
@@ -218,18 +219,24 @@ pub const Window = struct {
             } else if (key == 11) {
                 self.typed_char = '0';
             } else if (key == 12) {
-                self.typed_char = '-';
+                self.typed_char = if (is_shift) '_' else '-';
+            } else if (key == 52) {
+                self.typed_char = '.';
+            } else if (key == 39) {
+                self.typed_char = ':';
+            } else if (key == 53) {
+                self.typed_char = '/';
             } else if (key == 57) {
                 self.typed_char = ' ';
             } else {
                 const char_opt: ?u8 = switch (key) {
-                    16 => 'Q', 17 => 'W', 18 => 'E', 19 => 'R', 20 => 'T', 21 => 'Y', 22 => 'U', 23 => 'I', 24 => 'O', 25 => 'P',
-                    30 => 'A', 31 => 'S', 32 => 'D', 33 => 'F', 34 => 'G', 35 => 'H', 36 => 'J', 37 => 'K', 38 => 'L',
-                    44 => 'Z', 45 => 'X', 46 => 'C', 47 => 'V', 48 => 'B', 49 => 'N', 50 => 'M',
+                    16 => 'q', 17 => 'w', 18 => 'e', 19 => 'r', 20 => 't', 21 => 'y', 22 => 'u', 23 => 'i', 24 => 'o', 25 => 'p',
+                    30 => 'a', 31 => 's', 32 => 'd', 33 => 'f', 34 => 'g', 35 => 'h', 36 => 'j', 37 => 'k', 38 => 'l',
+                    44 => 'z', 45 => 'x', 46 => 'c', 47 => 'v', 48 => 'b', 49 => 'n', 50 => 'm',
                     else => null,
                 };
                 if (char_opt) |ch| {
-                    self.typed_char = ch;
+                    self.typed_char = if (is_shift) std.ascii.toUpper(ch) else ch;
                 }
             }
 

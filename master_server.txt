@@ -1,0 +1,3 @@
+# Airplane Combat Simulator - Master Server Configuration
+# Format: <domain_or_ip>:<port>
+jamilvoss.cyou:8080
