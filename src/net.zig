@@ -659,7 +659,7 @@ pub const MasterClient = struct {
     }
 
     pub fn getHost(self: *const MasterClient) []const u8 {
-        if (self.master_host_len == 0) return "127.0.0.1";
+        if (self.master_host_len == 0) return "jamilvoss.cyou";
         return self.master_host[0..self.master_host_len];
     }
 
@@ -753,7 +753,7 @@ pub const NetworkManager = struct {
 
     server_list: ServerList = ServerList.initDefault(),
     server_list_dirty: bool = false,
-    master_client: MasterClient = MasterClient.init("127.0.0.1", 8080),
+    master_client: MasterClient = MasterClient.init("jamilvoss.cyou", 8080),
     host_port: u16 = 7777,
     server_seq: u32 = 0,
     last_sync_time: f64 = 0.0,

@@ -662,7 +662,7 @@ fn printHelp() void {
         \\  --spawn <carrier|city>   Specify spawn location (carrier deck or metropolis)
         \\  --host [port]            Host multiplayer listen server (default: 7777)
         \\  --connect <ip:port>      Connect directly to multiplayer server
-        \\  --master <ip:port>       Automated master server address (default: 127.0.0.1:8080)
+        \\  --master <ip:port>       Automated master server address (default: jamilvoss.cyou:8080)
         \\  --test-net               Run automated multiplayer latency & impairment test suite
         \\  --lag <ms>               Simulate network latency in milliseconds
         \\  --jitter <ms>            Simulate network latency variance/jitter in milliseconds
