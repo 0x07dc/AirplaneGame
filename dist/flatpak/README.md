@@ -93,7 +93,7 @@ Make sure the `sources` in `io.github._0x07dc.AirplaneGame.yaml` point to the pu
     sources:
       - type: git
         url: https://github.com/0x07dc/AirplaneGame.git
-        tag: v0.1.0
+        tag: v0.1.1
         commit: <COMMIT_HASH>
 ```
 

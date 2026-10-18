@@ -21,7 +21,7 @@ This directory contains the packaging files required to publish `airplane-game` 
 
 | Package | Purpose | Source |
 | :--- | :--- | :--- |
-| **`airplane-game`** | Stable release package | Tagged release tarballs (`v0.1.0`) on GitHub |
+| **`airplane-game`** | Stable release package | Tagged release tarballs (`v0.1.1`) on GitHub |
 | **`airplane-game-git`** | Development / Rolling package | Latest commit on the `main` branch |
 
 Files in this directory:
@@ -45,11 +45,11 @@ Files in this directory:
    ```
 
 3. Update the checksum in `PKGBUILD`:
-   When publishing a real release tag (e.g. `v0.1.0`), calculate the sha256 of the release tarball:
+   When publishing a real release tag (e.g. `v0.1.1`), calculate the sha256 of the release tarball:
    ```bash
    updpkgsums
    ```
-   *(Alternatively, run `sha256sum airplane-game-0.1.0.tar.gz` and replace `'SKIP'` with the resulting hash)*.
+   *(Alternatively, run `sha256sum airplane-game-0.1.1.tar.gz` and replace `'SKIP'` with the resulting hash)*.
 
 4. Regenerate `.SRCINFO`:
    ```bash
@@ -69,7 +69,7 @@ Files in this directory:
 6. Commit and push to the AUR:
    ```bash
    git add PKGBUILD .SRCINFO
-   git commit -m "Initial release v0.1.0"
+   git commit -m "Release v0.1.1"
    git push origin master
    ```
 

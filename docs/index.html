@@ -1560,8 +1560,18 @@
       <div id="tab-arch" class="tab-pane active" role="tabpanel">
         <p style="color: var(--text-muted); margin-bottom: 0.75rem;"><strong>Direct Native Installation (Zero AUR Account Required):</strong> Install the pre-built native package directly with <code>pacman</code>:</p>
         <div class="cmd-line">
-          <code>sudo pacman -U https://github.com/0x07dc/AirplaneGame/releases/download/v0.1.0/airplane-game-0.1.0-1-x86_64.pkg.tar.zst</code>
-          <button type="button" class="copy-btn" onclick="copySnippet('sudo pacman -U https://github.com/0x07dc/AirplaneGame/releases/download/v0.1.0/airplane-game-0.1.0-1-x86_64.pkg.tar.zst', this)">Copy</button>
+          <code>sudo pacman -U https://github.com/0x07dc/AirplaneGame/releases/download/v0.1.1/airplane-game-0.1.1-1-x86_64.pkg.tar.zst</code>
+          <button type="button" class="copy-btn" onclick="copySnippet('sudo pacman -U https://github.com/0x07dc/AirplaneGame/releases/download/v0.1.1/airplane-game-0.1.1-1-x86_64.pkg.tar.zst', this)">Copy</button>
+        </div>
+
+        <p style="color: var(--text-muted); margin: 1.25rem 0 0.75rem;"><strong>Arch User Repository (AUR):</strong> Install using an AUR helper such as <code>yay</code>:</p>
+        <div class="cmd-line">
+          <code>yay -S airplane-game</code>
+          <button type="button" class="copy-btn" onclick="copySnippet('yay -S airplane-game', this)">Copy</button>
+        </div>
+        <div class="cmd-line">
+          <code>yay -S airplane-game-git</code>
+          <button type="button" class="copy-btn" onclick="copySnippet('yay -S airplane-game-git', this)">Copy</button>
         </div>
 
         <p style="color: var(--text-muted); margin: 1.25rem 0 0.75rem;"><strong>Build &amp; Install Locally via PKGBUILD from Public GitHub:</strong></p>
@@ -1632,12 +1642,12 @@
       <div id="tab-portable" class="tab-pane" role="tabpanel">
         <p style="color: var(--text-muted); margin-bottom: 0.75rem;"><strong>Download &amp; Run Portable Linux x86_64 Bundle:</strong> Zero package managers or toolchains required:</p>
         <div class="cmd-line">
-          <code>curl -LO https://github.com/0x07dc/AirplaneGame/releases/download/v0.1.0/airplane-game-0.1.0-linux-x86_64.tar.gz</code>
-          <button type="button" class="copy-btn" onclick="copySnippet('curl -LO https://github.com/0x07dc/AirplaneGame/releases/download/v0.1.0/airplane-game-0.1.0-linux-x86_64.tar.gz', this)">Copy</button>
+          <code>curl -LO https://github.com/0x07dc/AirplaneGame/releases/download/v0.1.1/airplane-game-0.1.1-linux-x86_64.tar.gz</code>
+          <button type="button" class="copy-btn" onclick="copySnippet('curl -LO https://github.com/0x07dc/AirplaneGame/releases/download/v0.1.1/airplane-game-0.1.1-linux-x86_64.tar.gz', this)">Copy</button>
         </div>
         <div class="cmd-line">
-          <code>tar -xzf airplane-game-0.1.0-linux-x86_64.tar.gz &amp;&amp; cd airplane_game-0.1.0 &amp;&amp; ./airplane_game</code>
-          <button type="button" class="copy-btn" onclick="copySnippet('tar -xzf airplane-game-0.1.0-linux-x86_64.tar.gz && cd airplane_game-0.1.0 && ./airplane_game', this)">Copy</button>
+          <code>tar -xzf airplane-game-0.1.1-linux-x86_64.tar.gz &amp;&amp; cd airplane_game-0.1.1 &amp;&amp; ./airplane_game</code>
+          <button type="button" class="copy-btn" onclick="copySnippet('tar -xzf airplane-game-0.1.1-linux-x86_64.tar.gz && cd airplane_game-0.1.1 && ./airplane_game', this)">Copy</button>
         </div>
       </div>
     </div>
@@ -1897,7 +1907,7 @@
 
       <div class="footer-bottom">
         <div>Copyright &copy; 2026 0x07dc. Licensed under the MIT License.</div>
-        <div>Engine Version 0.1.0 // ReleaseFast</div>
+        <div>Engine Version 0.1.1 // ReleaseFast</div>
       </div>
     </div>
   </footer>

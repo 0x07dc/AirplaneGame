@@ -87,23 +87,26 @@ Airplane Combat Simulator is prepared for distribution via **Flatpak (Flathub)**
 #### Option 1: Direct Native Package (Zero AUR Account Required)
 Install the pre-built native package directly with `pacman`:
 ```bash
-sudo pacman -U https://github.com/0x07dc/AirplaneGame/releases/download/v0.1.0/airplane-game-0.1.0-1-x86_64.pkg.tar.zst
+sudo pacman -U https://github.com/0x07dc/AirplaneGame/releases/download/v0.1.1/airplane-game-0.1.1-1-x86_64.pkg.tar.zst
+
+# Or install the locally compiled package from the repository:
+sudo pacman -U dist/arch/airplane-game-0.1.1-1-x86_64.pkg.tar.zst
 ```
 
-#### Option 2: Build Locally via PKGBUILD
+#### Option 2: Arch User Repository (AUR)
+```bash
+# Using yay (Stable Release):
+yay -S airplane-game
+
+# Or the cutting-edge Git development release (VCS):
+yay -S airplane-game-git
+```
+
+#### Option 3: Build Locally via PKGBUILD
 ```bash
 git clone https://github.com/0x07dc/AirplaneGame.git
 cd AirplaneGame/dist/arch
 makepkg -si
-```
-
-#### Option 3: Arch User Repository (AUR)
-```bash
-# Using yay (Stable Release)
-yay -S airplane-game
-
-# Or the cutting-edge Git development release:
-yay -S airplane-game-git
 ```
 
 ---

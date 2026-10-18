@@ -504,6 +504,18 @@ The top-level application loop transitions through strict states:
 
 ### 12.2 Arch Linux (AUR) Specification
 - **Package Names**: `airplane-game` (stable release), `airplane-game-git` (VCS master branch).
+- **Current Production Release**: `v0.1.1` (`airplane-game-0.1.1-1-x86_64.pkg.tar.zst`).
+- **Direct Native Installation**:
+  ```bash
+  sudo pacman -U https://github.com/0x07dc/AirplaneGame/releases/download/v0.1.1/airplane-game-0.1.1-1-x86_64.pkg.tar.zst
+  # Or install locally compiled repository package:
+  sudo pacman -U dist/arch/airplane-game-0.1.1-1-x86_64.pkg.tar.zst
+  ```
+- **AUR Helper Commands**:
+  ```bash
+  yay -S airplane-game       # Stable tagged release
+  yay -S airplane-game-git   # Rolling VCS git master
+  ```
 - **Build Tool**: Native `zig build -Doptimize=ReleaseFast -Duse-precompiled-shaders=true --prefix "$pkgdir/usr"`.
 - **FHS Integration**:
   - Binary: `/usr/bin/airplane_game`
@@ -537,6 +549,9 @@ appstreamcli validate --no-net dist/common/io.github._0x07dc.AirplaneGame.metain
 
 # 8. Desktop file validation:
 desktop-file-validate dist/common/io.github._0x07dc.AirplaneGame.desktop
+
+# 9. Arch Linux package integrity verification:
+pacman -Qip dist/arch/airplane-game-0.1.1-1-x86_64.pkg.tar.zst
 ```
 
 ---
